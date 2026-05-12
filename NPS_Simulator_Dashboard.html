@@ -1,0 +1,987 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NPS Asset Mix Simulator — JCP 2026</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600&family=Spectral:ital,wght@0,300;0,500;0,600;1,300&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+:root {
+  --bg:      #080C14;
+  --surf:    #0D1520;
+  --surf2:   #111C2C;
+  --surf3:   #162236;
+  --border:  #1E2D42;
+  --border2: #253549;
+  --text:    #D8E6F5;
+  --sub:     #6B8BAD;
+  --muted:   #384D63;
+  --gold:    #D4973A;
+  --gold2:   #F0B84A;
+  --blue:    #3A80CC;
+  --blue2:   #5B9FE8;
+  --green:   #2BAD76;
+  --red:     #CC3D3D;
+  --amber:   #C07A1A;
+  --purple:  #7B5EA7;
+  --teal:    #1E8C82;
+  --radius:  8px;
+  --radius-lg: 12px;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: 'IBM Plex Mono', monospace;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.6;
+  min-height: 100vh;
+}
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+
+/* ── LAYOUT ─────────────────────────────────────────────────────── */
+.app { display: flex; flex-direction: column; min-height: 100vh; }
+
+/* ── HEADER ─────────────────────────────────────────────────────── */
+header {
+  border-bottom: 1px solid var(--border);
+  padding: 0 28px;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  background: var(--surf);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.logo-mark {
+  width: 28px; height: 28px;
+  background: var(--gold);
+  border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 600; color: #080C14;
+}
+.logo-text { font-size: 13px; font-weight: 500; letter-spacing: .03em; color: var(--text); }
+.logo-sub  { font-size: 10px; color: var(--sub); letter-spacing: .05em; }
+nav { display: flex; gap: 4px; margin-left: auto; }
+nav a {
+  padding: 5px 10px;
+  font-size: 10px; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--sub); text-decoration: none; border-radius: var(--radius);
+  transition: all .15s;
+}
+nav a:hover { color: var(--text); background: var(--surf2); }
+.badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 10px; padding: 3px 8px;
+  background: rgba(212,151,58,.12);
+  border: 1px solid rgba(212,151,58,.3);
+  border-radius: 20px; color: var(--gold);
+  margin-left: 6px;
+}
+.badge::before { content:''; width:5px; height:5px; border-radius:50%; background:var(--gold); display:inline-block; }
+.calc-spin { animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── HERO BANNER ────────────────────────────────────────────────── */
+.hero {
+  padding: 32px 28px 24px;
+  border-bottom: 1px solid var(--border);
+  background: linear-gradient(160deg, var(--surf) 0%, var(--bg) 60%);
+  position: relative; overflow: hidden;
+}
+.hero::before {
+  content: '';
+  position: absolute; top: -60px; right: -40px;
+  width: 380px; height: 380px;
+  background: radial-gradient(circle, rgba(212,151,58,.055) 0%, transparent 70%);
+  pointer-events: none;
+}
+.hero-tag {
+  font-size: 10px; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--gold); margin-bottom: 10px;
+  display: flex; align-items: center; gap: 8px;
+}
+.hero-tag::before { content:''; display:block; width:20px; height:1px; background:var(--gold); }
+.hero h1 {
+  font-family: 'Spectral', serif;
+  font-size: 26px; font-weight: 600; color: var(--text);
+  line-height: 1.25; max-width: 680px; margin-bottom: 10px;
+  letter-spacing: -.01em;
+}
+.hero h1 em { font-style: italic; color: var(--gold); }
+.hero-meta { display: flex; flex-wrap: wrap; gap: 20px; margin-top: 14px; }
+.meta-chip {
+  font-size: 10px; color: var(--sub); letter-spacing: .04em;
+  display: flex; align-items: center; gap: 5px;
+}
+.meta-chip strong { color: var(--text); font-weight: 500; }
+.meta-chip::before { content: '·'; color: var(--muted); }
+.meta-chip:first-child::before { display: none; }
+
+/* ── MAIN GRID ──────────────────────────────────────────────────── */
+.body {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  flex: 1;
+  min-height: 0;
+}
+
+/* ── SIDEBAR ────────────────────────────────────────────────────── */
+aside {
+  border-right: 1px solid var(--border);
+  padding: 16px;
+  background: var(--surf);
+  overflow-y: auto;
+  position: sticky;
+  top: 52px;
+  height: calc(100vh - 52px);
+}
+.aside-section { margin-bottom: 20px; }
+.aside-section:last-child { margin-bottom: 0; }
+.aside-title {
+  font-size: 9px; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--muted); margin-bottom: 10px;
+  padding-bottom: 6px; border-bottom: 1px solid var(--border);
+}
+.ctrl { margin-bottom: 11px; }
+.ctrl-label {
+  display: flex; justify-content: space-between;
+  font-size: 11px; color: var(--sub); margin-bottom: 5px;
+}
+.ctrl-label .val { color: var(--gold); font-weight: 500; }
+input[type=range] {
+  width: 100%; height: 2px; margin: 0;
+  -webkit-appearance: none; appearance: none;
+  background: var(--border2); border-radius: 1px; outline: none; cursor: pointer;
+}
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 14px; height: 14px;
+  border-radius: 50%; background: var(--gold);
+  border: 2px solid var(--bg); cursor: pointer;
+  transition: transform .1s;
+}
+input[type=range]:hover::-webkit-slider-thumb { transform: scale(1.2); }
+select {
+  width: 100%; padding: 6px 8px;
+  background: var(--surf2); border: 1px solid var(--border2);
+  border-radius: var(--radius); color: var(--text);
+  font-family: inherit; font-size: 11px; outline: none; cursor: pointer;
+}
+select:focus { border-color: var(--gold); }
+select option { background: var(--surf2); }
+
+.scenario-btns { display: flex; flex-direction: column; gap: 5px; margin-top: 6px; }
+.sc-btn {
+  padding: 6px 10px; font-family: inherit; font-size: 10px;
+  border: 1px solid var(--border2); border-radius: var(--radius);
+  background: var(--surf2); color: var(--sub); cursor: pointer;
+  text-align: left; transition: all .15s; letter-spacing: .02em;
+}
+.sc-btn:hover { border-color: var(--border2); background: var(--surf3); color: var(--text); }
+.sc-btn.active { border-color: var(--gold); color: var(--gold); background: rgba(212,151,58,.08); }
+
+/* ── CONTENT AREA ───────────────────────────────────────────────── */
+main { padding: 20px 24px; overflow-y: auto; }
+
+/* ── KPI GRID ───────────────────────────────────────────────────── */
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 10px;
+  margin-bottom: 20px;
+}
+.kpi {
+  background: var(--surf);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 14px 16px;
+  position: relative; overflow: hidden;
+  transition: border-color .2s;
+}
+.kpi:hover { border-color: var(--border2); }
+.kpi::after {
+  content: '';
+  position: absolute; top: 0; left: 0;
+  width: 100%; height: 2px;
+}
+.kpi.c-blue::after   { background: var(--blue); }
+.kpi.c-green::after  { background: var(--green); }
+.kpi.c-amber::after  { background: var(--amber); }
+.kpi.c-red::after    { background: var(--red); }
+.kpi.c-purple::after { background: var(--purple); }
+.kpi-label { font-size: 9px; letter-spacing: .1em; text-transform: uppercase; color: var(--sub); margin-bottom: 6px; }
+.kpi-value { font-size: 28px; font-weight: 300; letter-spacing: -.03em; line-height: 1; }
+.kpi-value.blue   { color: var(--blue2); }
+.kpi-value.green  { color: var(--green); }
+.kpi-value.amber  { color: var(--gold2); }
+.kpi-value.red    { color: var(--red); }
+.kpi-value.purple { color: var(--purple); }
+.kpi-sub { font-size: 9px; color: var(--sub); margin-top: 4px; }
+
+/* ── CHART GRID ─────────────────────────────────────────────────── */
+.chart-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+.chart-grid.wide { grid-template-columns: 1.5fr 1fr; }
+.card {
+  background: var(--surf);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 14px 16px;
+}
+.card-head {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 10px;
+}
+.card-title { font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--sub); }
+.card-tag {
+  font-size: 9px; padding: 2px 7px;
+  border: 1px solid var(--border2);
+  border-radius: 20px; color: var(--muted);
+}
+.chart-wrap { position: relative; }
+.h160 { height: 160px; }
+.h200 { height: 200px; }
+.h240 { height: 240px; }
+.legend { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 8px; }
+.leg {
+  display: flex; align-items: center; gap: 5px;
+  font-size: 10px; color: var(--sub);
+}
+.leg-dot { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
+.leg-line {
+  width: 16px; height: 2px; flex-shrink: 0;
+  border-top: 2px solid;
+}
+.leg-dash {
+  width: 16px; height: 2px; flex-shrink: 0;
+  border-top: 2px dashed;
+}
+
+/* ── GLIDE PATH BARS ────────────────────────────────────────────── */
+.glide-table { width: 100%; }
+.glide-row {
+  display: grid;
+  grid-template-columns: 22px 1fr 6px 1fr;
+  gap: 4px; align-items: center;
+  margin-bottom: 3px;
+}
+.glide-age { font-size: 9px; color: var(--muted); text-align: right; }
+.glide-bar { height: 11px; display: flex; border-radius: 2px; overflow: hidden; }
+.glide-seg { height: 100%; }
+
+/* ── SCENARIO TABLE ─────────────────────────────────────────────── */
+.sc-table { width: 100%; border-collapse: collapse; }
+.sc-table th {
+  font-size: 9px; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--muted); padding: 5px 8px; text-align: right;
+  border-bottom: 1px solid var(--border);
+}
+.sc-table th:first-child { text-align: left; }
+.sc-table td {
+  font-size: 11px; padding: 5px 8px;
+  border-bottom: 1px solid var(--border);
+  text-align: right; color: var(--sub);
+}
+.sc-table td:first-child { text-align: left; color: var(--text); }
+.sc-table tr:last-child td { border-bottom: none; }
+.sc-table tr:hover td { background: var(--surf2); }
+.sc-table .pos { color: var(--green); font-weight: 500; }
+.sc-table .neg { color: var(--red); font-weight: 500; }
+.sc-table .neutral { color: var(--gold); font-weight: 500; }
+
+/* ── FOOTER ─────────────────────────────────────────────────────── */
+footer {
+  border-top: 1px solid var(--border);
+  padding: 14px 28px;
+  background: var(--surf);
+  display: flex; align-items: center; gap: 20px;
+  font-size: 10px; color: var(--muted);
+}
+footer strong { color: var(--sub); }
+footer .spacer { flex: 1; }
+</style>
+</head>
+<body>
+<div class="app">
+
+<!-- HEADER -->
+<header>
+  <div class="logo">
+    <div class="logo-mark">N</div>
+    <div>
+      <div class="logo-text">NPS Simulator</div>
+      <div class="logo-sub">JCP 2026 · PFRDA / IAI</div>
+    </div>
+  </div>
+  <nav>
+    <a href="#kpis">KPIs</a>
+    <a href="#fanChart">Fan Chart</a>
+    <a href="#strategies">Strategies</a>
+    <a href="#scenarios">Scenarios</a>
+    <a href="#glide">Glide Path</a>
+  </nav>
+  <div class="badge" id="status-badge" style="display:none">calculating</div>
+</header>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-tag">Track 2 · Investment Practices for 30–60 Year Horizons</div>
+  <h1>Optimal asset mix for NPS under <em>long secular horizons</em></h1>
+  <div class="hero-meta">
+    <span class="meta-chip"><strong>Method</strong> Monte Carlo simulation</span>
+    <span class="meta-chip"><strong>Models</strong> Regime-switching GBM · Vasicek · OU inflation</span>
+    <span class="meta-chip"><strong>Liability</strong> IAI LIC 2006-08 mortality</span>
+    <span class="meta-chip"><strong>AI layer</strong> Dynamic regime-based de-risking</span>
+    <span class="meta-chip" id="hero-paths">10,000 paths</span>
+  </div>
+</div>
+
+<!-- BODY -->
+<div class="body">
+
+<!-- SIDEBAR -->
+<aside>
+  <div class="aside-section">
+    <div class="aside-title">Simulation</div>
+    <div class="ctrl">
+      <div class="ctrl-label">Monte Carlo paths <span class="val" id="v-paths">1000</span></div>
+      <input type="range" id="s-paths" min="200" max="5000" step="200" value="1000">
+    </div>
+    <div class="ctrl">
+      <div class="ctrl-label">Entry age <span class="val" id="v-age">25</span></div>
+      <input type="range" id="s-age" min="25" max="50" step="1" value="25">
+    </div>
+    <div class="ctrl">
+      <div class="ctrl-label">Strategy</div>
+      <select id="s-strat">
+        <option value="current">Current NPS (75% E)</option>
+        <option value="proposed" selected>Proposed (85% E + InvIT)</option>
+        <option value="ai">AI Dynamic Glide Path</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="aside-section">
+    <div class="aside-title">Capital Markets</div>
+    <div class="ctrl">
+      <div class="ctrl-label">Equity bull return <span class="val" id="v-eq">13.5%</span></div>
+      <input type="range" id="s-eq" min="6" max="22" step="0.5" value="13.5">
+    </div>
+    <div class="ctrl">
+      <div class="ctrl-label">Equity volatility (bull) <span class="val" id="v-eqvol">18%</span></div>
+      <input type="range" id="s-eqvol" min="10" max="35" step="1" value="18">
+    </div>
+    <div class="ctrl">
+      <div class="ctrl-label">G-Sec long-run mean <span class="val" id="v-gs">7.2%</span></div>
+      <input type="range" id="s-gs" min="4" max="11" step="0.1" value="7.2">
+    </div>
+    <div class="ctrl">
+      <div class="ctrl-label">InvIT return <span class="val" id="v-invit">10.5%</span></div>
+      <input type="range" id="s-invit" min="7" max="16" step="0.5" value="10.5">
+    </div>
+    <div class="ctrl">
+      <div class="ctrl-label">Inflation (long-run) <span class="val" id="v-pi">5.5%</span></div>
+      <input type="range" id="s-pi" min="2" max="10" step="0.5" value="5.5">
+    </div>
+  </div>
+
+  <div class="aside-section">
+    <div class="aside-title">Liability & Contribution</div>
+    <div class="ctrl">
+      <div class="ctrl-label">Target replacement rate <span class="val" id="v-rr">50%</span></div>
+      <input type="range" id="s-rr" min="30" max="80" step="5" value="50">
+    </div>
+    <div class="ctrl">
+      <div class="ctrl-label">Contribution rate <span class="val" id="v-contrib">24%</span></div>
+      <input type="range" id="s-contrib" min="15" max="36" step="1" value="24">
+    </div>
+  </div>
+
+  <div class="aside-section">
+    <div class="aside-title">Load scenario</div>
+    <div class="scenario-btns" id="sc-btns">
+      <button class="sc-btn active" data-sc="base">Base Case</button>
+      <button class="sc-btn" data-sc="hi_infl">High Inflation (+200bps CPI)</button>
+      <button class="sc-btn" data-sc="rates">Rising Rates (+150bps)</button>
+      <button class="sc-btn" data-sc="stress">Market Stress (2008-type)</button>
+      <button class="sc-btn" data-sc="low">Prolonged Low Growth</button>
+      <button class="sc-btn" data-sc="bull">Bull Case</button>
+    </div>
+  </div>
+</aside>
+
+<!-- MAIN CONTENT -->
+<main>
+
+  <!-- KPI CARDS -->
+  <div class="kpis" id="kpis">
+    <div class="kpi c-blue">
+      <div class="kpi-label">Median RR</div>
+      <div class="kpi-value blue" id="k-median">—</div>
+      <div class="kpi-sub" id="k-median-sub">selected strategy</div>
+    </div>
+    <div class="kpi c-green">
+      <div class="kpi-label">P5 Replacement Rate</div>
+      <div class="kpi-value green" id="k-p5">—</div>
+      <div class="kpi-sub">worst 5% of paths</div>
+    </div>
+    <div class="kpi c-amber">
+      <div class="kpi-label">P95 Replacement Rate</div>
+      <div class="kpi-value amber" id="k-p95">—</div>
+      <div class="kpi-sub">best 5% of paths</div>
+    </div>
+    <div class="kpi c-red">
+      <div class="kpi-label">CVaR 95%</div>
+      <div class="kpi-value red" id="k-cvar">—</div>
+      <div class="kpi-sub">tail-risk metric</div>
+    </div>
+    <div class="kpi c-purple">
+      <div class="kpi-label">vs Current NPS</div>
+      <div class="kpi-value" id="k-delta" style="color:var(--purple)">—</div>
+      <div class="kpi-sub">improvement in median RR</div>
+    </div>
+  </div>
+
+  <!-- ROW 1: FAN + STRATEGY -->
+  <div class="chart-grid wide" id="fanChart">
+    <div class="card">
+      <div class="card-head">
+        <span class="card-title">Funding ratio — percentile fan</span>
+        <span class="card-tag" id="fan-tag">Age 25 · 35yr</span>
+      </div>
+      <div class="legend">
+        <span class="leg"><span class="leg-line" style="border-color:var(--blue2)"></span>Median</span>
+        <span class="leg"><span class="leg-dot" style="background:rgba(58,128,204,.35)"></span>25–75th pct</span>
+        <span class="leg"><span class="leg-dot" style="background:rgba(58,128,204,.15)"></span>5–95th pct</span>
+        <span class="leg"><span class="leg-dash" style="border-color:var(--muted)"></span>Target 1.0x</span>
+      </div>
+      <div class="chart-wrap h240"><canvas id="c-fan" role="img" aria-label="Funding ratio fan chart showing trajectory bands from entry to retirement age 60">Funding ratio percentile bands over the accumulation horizon.</canvas></div>
+    </div>
+
+    <div class="card" id="strategies">
+      <div class="card-head">
+        <span class="card-title">Strategy comparison</span>
+        <span class="card-tag">all cohorts</span>
+      </div>
+      <div class="legend">
+        <span class="leg"><span class="leg-dot" style="background:var(--red)"></span>Current 75%E</span>
+        <span class="leg"><span class="leg-dot" style="background:var(--green)"></span>Proposed</span>
+        <span class="leg"><span class="leg-dot" style="background:var(--gold)"></span>AI Dynamic</span>
+      </div>
+      <div class="chart-wrap h240"><canvas id="c-strat" role="img" aria-label="Bar chart comparing median replacement rates across three strategies and three entry ages">Strategy vs entry age comparison.</canvas></div>
+    </div>
+  </div>
+
+  <!-- ROW 2: SCENARIOS TABLE + GLIDE + RR DIST -->
+  <div class="chart-grid" id="scenarios" style="grid-template-columns:1.2fr 0.8fr">
+    <div class="card">
+      <div class="card-head">
+        <span class="card-title">Scenario analysis</span>
+        <span class="card-tag">age 25 · proposed strategy</span>
+      </div>
+      <div class="chart-wrap h200"><canvas id="c-scene" role="img" aria-label="Grouped bar chart of replacement rates across six macroeconomic scenarios">Scenario analysis bar chart.</canvas></div>
+      <table class="sc-table" id="sc-table" style="margin-top:12px"></table>
+    </div>
+
+    <div class="card" id="glide">
+      <div class="card-head">
+        <span class="card-title">Glide path</span>
+        <span class="card-tag">current vs proposed</span>
+      </div>
+      <div class="legend">
+        <span class="leg"><span class="leg-dot" style="background:#D4973A"></span>Equity</span>
+        <span class="leg"><span class="leg-dot" style="background:#2BAD76"></span>Corp</span>
+        <span class="leg"><span class="leg-dot" style="background:#3A80CC"></span>G-Sec</span>
+        <span class="leg"><span class="leg-dot" style="background:#7B5EA7"></span>InvIT</span>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;font-size:9px;color:var(--muted);text-align:center">
+        <span>Current NPS</span><span>Proposed</span>
+      </div>
+      <div id="glide-rows"></div>
+    </div>
+  </div>
+
+  <!-- ROW 3: RR HISTOGRAM -->
+  <div class="chart-grid" style="grid-template-columns:1fr 1fr">
+    <div class="card">
+      <div class="card-head">
+        <span class="card-title">Replacement rate distribution</span>
+        <span class="card-tag" id="hist-tag">selected strategy</span>
+      </div>
+      <div class="chart-wrap h160"><canvas id="c-hist" role="img" aria-label="Histogram of replacement rate outcomes from Monte Carlo simulation">Replacement rate frequency distribution.</canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-head">
+        <span class="card-title">Median RR by entry age — all strategies</span>
+        <span class="card-tag">radar view</span>
+      </div>
+      <div class="chart-wrap h160"><canvas id="c-radar" role="img" aria-label="Grouped bar chart showing median replacement rate for each entry age and strategy combination">Entry age sensitivity chart.</canvas></div>
+    </div>
+  </div>
+
+</main>
+</div>
+
+<!-- FOOTER -->
+<footer>
+  <strong>NPS Asset Mix Simulator v1.0</strong>
+  &nbsp;·&nbsp; Paper: <em>Optimal asset mix for NPS under long secular horizons: a liability-aware approach</em>
+  &nbsp;·&nbsp; JCP 2026 · PFRDA / IAI · Track 2
+  <span class="spacer"></span>
+  <span id="footer-time"></span>
+  &nbsp;·&nbsp; All results illustrative · Not investment advice
+</footer>
+
+</div><!-- .app -->
+
+<script>
+'use strict';
+const CHARTS = {};
+const SCENARIOS_DEF = {
+  base:    { eq:13.5, gs:7.2,  pi:5.5,  label:'Base Case'            },
+  hi_infl: { eq:11.0, gs:8.5,  pi:7.5,  label:'High Inflation'       },
+  rates:   { eq:10.0, gs:9.0,  pi:6.0,  label:'Rising Rates +150bps' },
+  stress:  { eq:-8.0, gs:8.0,  pi:5.5,  label:'Market Stress'        },
+  low:     { eq:7.0,  gs:5.5,  pi:4.0,  label:'Prolonged Low Growth' },
+  bull:    { eq:17.0, gs:7.5,  pi:5.0,  label:'Bull Case'            },
+};
+
+/* ── MATH UTILS ────────────────────────────────────────────────── */
+function randn(){
+  const u=Math.max(Math.random(),1e-10);
+  return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*Math.random());
+}
+
+/* ── MORTALITY (IAI LIC 2006-08, 1.5%/yr improvement to 2026) ─── */
+function buildMortality(){
+  const qx=new Float64Array(101);
+  let lx=100000;
+  const lxArr=new Float64Array(101);
+  lxArr[0]=lx;
+  const improvement=Math.pow(1-0.015,18);
+  for(let i=0;i<=100;i++){
+    const raw=Math.min(Math.max(0.00022+0.0000027*Math.pow(1.124,i),0),1);
+    qx[i]=raw*improvement;
+    if(i>0){lxArr[i]=lxArr[i-1]*(1-qx[i-1]);}
+  }
+  return{qx,lxArr};
+}
+const MORT=buildMortality();
+
+function tpx(x,t){
+  if(x+t>100) return 0;
+  return MORT.lxArr[Math.min(x+t,100)]/Math.max(MORT.lxArr[x],1);
+}
+
+function annuityPV(retireAge,i,maxAge=88){
+  const v=1/(1+i);
+  let apv=0;
+  for(let t=0;t<=maxAge-retireAge;t++) apv+=Math.pow(v,t)*tpx(retireAge,t);
+  return Math.max(apv,1);
+}
+
+/* ── GLIDE WEIGHTS ─────────────────────────────────────────────── */
+function weights(strategy,age,propEq=0.85,propAlt=0.10){
+  if(strategy==='current'){
+    const wE=age<=35?0.75:(age>=55?0.15:Math.max(0.15,0.75-(age-35)*0.03));
+    return{E:wE,C:0.10,G:Math.max(0,1-wE-0.15),Alt:0.05};
+  }
+  let wE,wAlt;
+  if(age<=34)     {wE=propEq;wAlt=propAlt;}
+  else if(age<=44){wE=0.70;wAlt=propAlt;}
+  else if(age<=49){wE=0.55;wAlt=propAlt+0.05;}
+  else if(age<=54){wE=0.35;wAlt=propAlt+0.10;}
+  else            {wE=0.15;wAlt=propAlt+0.10;}
+  const wC=0.05;
+  return{E:wE,C:wC,G:Math.max(0,1-wE-wC-wAlt),Alt:Math.min(wAlt,0.30)};
+}
+
+/* ── SIMULATION ────────────────────────────────────────────────── */
+function simulate(params){
+  const{nPaths:n,entryAge,strategy,muEq,sigEq,theta,muInvIT,thetaPi,targetRR,contrib}=params;
+  const years=60-entryAge, steps=years*12, dt=1/12;
+  const FAN_STEPS=8;
+  const fanStep=Math.max(1,Math.floor(steps/FAN_STEPS));
+  const fanBuckets=Array.from({length:FAN_STEPS+1},()=>[]);
+  const rrs=new Float64Array(n);
+
+  for(let p=0;p<n;p++){
+    let corpus=0, salary=1.0;
+    let rate=theta/100;
+    let isStress=false;
+    let eq12=muEq/100, vol12=sigEq/100;
+    let aiAdj=0;
+
+    for(let t=0;t<=steps;t++){
+      const age=entryAge+t*dt|0;
+      const fi=Math.min(Math.floor(t/fanStep),FAN_STEPS);
+      const apvNow=annuityPV(60,rate,88);
+      const libNow=salary*targetRR*apvNow;
+      fanBuckets[fi].push(corpus/Math.max(libNow,0.001));
+
+      if(t===steps) break;
+
+      const tr=Math.random();
+      isStress=isStress?(tr>0.25):(tr<0.06);
+      const muEqNow=isStress?-0.08:muEq/100;
+      const sgEqNow=isStress?0.38:sigEq/100;
+
+      const eqRet=(muEqNow-0.5*sgEqNow*sgEqNow)*dt+sgEqNow*Math.sqrt(dt)*randn();
+      const dWr=Math.sqrt(dt)*randn();
+      const prevRate=rate;
+      rate=Math.max(rate+0.18*(theta/100-rate)*dt+0.012*dWr,0.003);
+      const gsecRet=prevRate*dt-8.0*(rate-prevRate);
+      const cbRet=(0.080)*dt+0.045*Math.sqrt(dt)*randn();
+      const altRet=(muInvIT/100)*dt+0.12*Math.sqrt(dt)*randn();
+      const pi=(thetaPi/100)+(randn()*0.015);
+      salary*=(1+(0.02+pi)*dt);
+
+      if(strategy==='ai' && t%12===0 && t>12){
+        eq12=0.97*eq12+0.03*eqRet/dt;
+        const stressProb=eq12<-0.05?0.75:(eq12<0.05?0.50:0.18);
+        aiAdj=stressProb>0.65?-0.10:(stressProb<0.35?0:aiAdj);
+      }
+      const w=weights(strategy,age);
+      const wE=Math.max(0,w.E+(strategy==='ai'?aiAdj:0));
+      const portRet=wE*eqRet+w.C*cbRet+w.G*gsecRet+w.Alt*altRet;
+      corpus=corpus*(1+portRet)+salary*(contrib/100)*dt;
+    }
+    const apv=annuityPV(60,rate,88);
+    rrs[p]=corpus/Math.max(salary*targetRR*apv,0.001);
+  }
+
+  const sorted=[...rrs].sort((a,b)=>a-b);
+  const p5i=Math.max(0,Math.floor(n*0.05)-1);
+  const p25i=Math.max(0,Math.floor(n*0.25)-1);
+  const p50i=Math.max(0,Math.floor(n*0.50)-1);
+  const p75i=Math.max(0,Math.floor(n*0.75)-1);
+  const p95i=Math.min(n-1,Math.floor(n*0.95));
+  const cvarSlice=sorted.slice(0,Math.max(1,p5i+1));
+  const cvar95=Math.abs(cvarSlice.reduce((s,v)=>s+v,0)/cvarSlice.length);
+
+  const fanPct=fanBuckets.map(arr=>{
+    if(!arr.length) return{p5:0,p25:0,med:0,p75:0,p95:0};
+    arr.sort((a,b)=>a-b);
+    const l=arr.length;
+    return{
+      p5: arr[Math.floor(l*0.05)]||0,
+      p25:arr[Math.floor(l*0.25)]||0,
+      med:arr[Math.floor(l*0.50)]||0,
+      p75:arr[Math.floor(l*0.75)]||0,
+      p95:arr[Math.min(Math.floor(l*0.95),l-1)]||0,
+    };
+  });
+
+  return{
+    medianRR:sorted[p50i],p5RR:sorted[p5i],p25RR:sorted[p25i],
+    p75RR:sorted[p75i],p95RR:sorted[p95i],cvar95,
+    fanPct,rawRR:sorted,
+    fanLabels:Array.from({length:FAN_STEPS+1},(_,i)=>{
+      const yr=Math.round(i*(years/FAN_STEPS));
+      return yr===0?'Start':(yr===years?'Retire':`${yr}yr`);
+    }),
+  };
+}
+
+/* ── CHART HELPERS ─────────────────────────────────────────────── */
+function mkChart(id,type,data,options={}){
+  const canvas=document.getElementById(id);
+  if(!canvas) return null;
+  if(CHARTS[id]){CHARTS[id].destroy();}
+  const merged={
+    type, data,
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      animation:{duration:300},
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:cb=>{
+        const v=cb.raw;
+        return typeof v==='number'?v.toFixed(2)+'x':String(v);
+      }}}},
+      ...options
+    }
+  };
+  CHARTS[id]=new Chart(canvas,merged);
+  return CHARTS[id];
+}
+const GRAY_GRID='rgba(30,45,66,.8)';
+const TICK_FONT={size:9,family:"'IBM Plex Mono',monospace"};
+const TICK_COLOR='#384D63';
+function scaleY(opts={}){
+  return{y:{ticks:{callback:v=>v.toFixed(1)+'x',color:TICK_COLOR,font:TICK_FONT},
+             grid:{color:GRAY_GRID},min:0,...opts}};
+}
+function scaleX(rotate=0){
+  return{x:{ticks:{color:TICK_COLOR,font:TICK_FONT,maxRotation:rotate,minRotation:rotate},
+             grid:{display:false}}};
+}
+
+/* ── RENDER FUNCTIONS ──────────────────────────────────────────── */
+function renderFan(res,years){
+  const f=res.fanPct, L=res.fanLabels;
+  mkChart('c-fan','line',{
+    labels:L,
+    datasets:[
+      {label:'5-95%',  data:f.map(d=>+d.p95.toFixed(3)),fill:'+1',
+       backgroundColor:'rgba(58,128,204,.12)',borderColor:'transparent',pointRadius:0,tension:.4},
+      {label:'5th',    data:f.map(d=>+d.p5.toFixed(3)), fill:false,
+       borderColor:'rgba(58,128,204,.2)',borderDash:[3,3],borderWidth:1,pointRadius:0,tension:.4},
+      {label:'25-75%', data:f.map(d=>+d.p75.toFixed(3)),fill:'+1',
+       backgroundColor:'rgba(58,128,204,.25)',borderColor:'transparent',pointRadius:0,tension:.4},
+      {label:'25th',   data:f.map(d=>+d.p25.toFixed(3)),fill:false,
+       borderColor:'rgba(58,128,204,.35)',borderWidth:1,pointRadius:0,tension:.4},
+      {label:'Median', data:f.map(d=>+d.med.toFixed(3)),fill:false,
+       borderColor:'#5B9FE8',borderWidth:2.5,pointRadius:0,tension:.4},
+      {label:'Target', data:L.map(()=>1.0),fill:false,
+       borderColor:'#384D63',borderDash:[5,5],borderWidth:1,pointRadius:0},
+    ]
+  },{scales:{...scaleY(),...scaleX()}});
+  document.getElementById('fan-tag').textContent=`Age ${getP().entryAge} · ${years}yr horizon`;
+}
+
+function renderStrat(params){
+  const ages=[25,35,45];
+  const strats=['current','proposed','ai'];
+  const colors=['#CC3D3D','#2BAD76','#D4973A'];
+  const datasets=strats.map((s,si)=>({
+    label:['Current','Proposed','AI'][si],
+    data:ages.map(a=>{
+      const r=simulate({...params,nPaths:Math.min(params.nPaths,400),entryAge:a,strategy:s});
+      return +r.medianRR.toFixed(3);
+    }),
+    backgroundColor:colors[si]+'BB',borderColor:colors[si],borderWidth:1,
+  }));
+  mkChart('c-strat','bar',{labels:['Age 25','Age 35','Age 45'],datasets},
+    {scales:{...scaleY(),...scaleX()},barPercentage:.7,categoryPercentage:.8});
+}
+
+function renderScenario(params){
+  const keys=Object.keys(SCENARIOS_DEF);
+  const labels=keys.map(k=>SCENARIOS_DEF[k].label.replace(' (','\n('));
+  const medians=[],p5s=[],cvars=[];
+  const tableData=[];
+  keys.forEach(k=>{
+    const sc=SCENARIOS_DEF[k];
+    const r=simulate({...params,muEq:sc.eq,theta:sc.gs,thetaPi:sc.pi,
+                       nPaths:Math.min(params.nPaths,300),entryAge:25,strategy:'proposed'});
+    medians.push(+r.medianRR.toFixed(3));
+    p5s.push(+r.p5RR.toFixed(3));
+    cvars.push(+r.cvar95.toFixed(3));
+    tableData.push({label:sc.label,med:r.medianRR,p5:r.p5RR,cvar:r.cvar95});
+  });
+  mkChart('c-scene','bar',{
+    labels:keys.map(k=>SCENARIOS_DEF[k].label.slice(0,10)+'…').map((l,i)=>keys[i]==='base'?'Base':l.replace('…','')),
+    datasets:[
+      {label:'Median RR',data:medians,backgroundColor:'#2BAD7699',borderColor:'#2BAD76',borderWidth:1},
+      {label:'P5 RR',    data:p5s,    backgroundColor:'#3A80CC99',borderColor:'#3A80CC',borderWidth:1},
+      {label:'CVaR',     data:cvars,  backgroundColor:'#CC3D3D99',borderColor:'#CC3D3D',borderWidth:1},
+    ]
+  },{scales:{...scaleY(),...scaleX(20)},barPercentage:.75,categoryPercentage:.9});
+
+  const tbl=document.getElementById('sc-table');
+  const base=tableData[0].med;
+  tbl.innerHTML=`<thead><tr>
+    <th>Scenario</th><th>Median RR</th><th>P5 RR</th><th>CVaR</th><th>vs Base</th>
+  </tr></thead><tbody>`+tableData.map(d=>{
+    const diff=((d.med/base)-1)*100;
+    const cls=diff>=0?'pos':(diff<-15?'neg':'neutral');
+    const sign=diff>=0?'+':'';
+    return`<tr><td>${d.label}</td><td>${d.med.toFixed(2)}x</td>
+      <td>${d.p5.toFixed(2)}x</td><td>${d.cvar.toFixed(2)}x</td>
+      <td class="${cls}">${sign}${diff.toFixed(1)}%</td></tr>`;
+  }).join('')+'</tbody>';
+}
+
+function renderGlide(){
+  const ages=[25,30,35,40,45,50,55,60];
+  const COLS={E:'#D4973A',C:'#2BAD76',G:'#3A80CC',Alt:'#7B5EA7'};
+  const wrap=document.getElementById('glide-rows');
+  wrap.innerHTML=ages.map(age=>{
+    const wc=weights('current',age);
+    const wp=weights('proposed',age);
+    const barHTML=(w)=>`
+      <div class="glide-bar">
+        <div class="glide-seg" style="width:${(w.E*100).toFixed(1)}%;background:${COLS.E}"></div>
+        <div class="glide-seg" style="width:${(w.C*100).toFixed(1)}%;background:${COLS.C}"></div>
+        <div class="glide-seg" style="width:${(w.G*100).toFixed(1)}%;background:${COLS.G}"></div>
+        <div class="glide-seg" style="width:${(w.Alt*100).toFixed(1)}%;background:${COLS.Alt}"></div>
+      </div>`;
+    return`<div class="glide-row">
+      <span class="glide-age">${age}</span>
+      ${barHTML(wc)}<div style="width:4px"></div>${barHTML(wp)}
+    </div>`;
+  }).join('');
+}
+
+function renderHist(rawRR){
+  const bins=30, minV=0, maxV=Math.min(6,Math.max(...rawRR)+0.5);
+  const w=(maxV-minV)/bins;
+  const counts=new Array(bins).fill(0);
+  rawRR.forEach(v=>{
+    const b=Math.min(bins-1,Math.floor((Math.min(v,maxV-0.001)-minV)/w));
+    counts[b]++;
+  });
+  const labels=Array.from({length:bins},(_,i)=>(minV+i*w).toFixed(1));
+  mkChart('c-hist','bar',{
+    labels,
+    datasets:[{
+      label:'Frequency',data:counts,
+      backgroundColor:'rgba(58,128,204,.55)',borderColor:'#3A80CC',borderWidth:0,
+      borderRadius:1,
+    }]
+  },{
+    scales:{
+      y:{ticks:{color:TICK_COLOR,font:TICK_FONT},grid:{color:GRAY_GRID}},
+      x:{ticks:{color:TICK_COLOR,font:{size:8,family:"'IBM Plex Mono',monospace"},
+                maxTicksLimit:8,callback:v=>Number(v).toFixed(1)+'x'},
+         grid:{display:false}},
+    },
+    plugins:{tooltip:{callbacks:{title:([cb])=>`~${Number(cb.label).toFixed(1)}x`,
+                                  label:cb=>`Count: ${cb.raw}`}}},
+  });
+}
+
+function renderRadar(params){
+  const ages=[25,35,45];
+  const strats=['current','proposed','ai'];
+  const colors=['#CC3D3D','#2BAD76','#D4973A'];
+  const datasets=strats.map((s,si)=>({
+    label:['Current','Proposed','AI'][si],
+    data:ages.map(a=>{
+      const r=simulate({...params,nPaths:Math.min(params.nPaths,300),entryAge:a,strategy:s});
+      return +r.medianRR.toFixed(3);
+    }),
+    backgroundColor:colors[si]+'44',borderColor:colors[si],borderWidth:1.5,pointRadius:3,
+    pointBackgroundColor:colors[si],tension:.1,
+  }));
+  mkChart('c-radar','line',{
+    labels:['Age 25','Age 35','Age 45'],datasets
+  },{
+    scales:{
+      y:{ticks:{callback:v=>v.toFixed(1)+'x',color:TICK_COLOR,font:TICK_FONT},
+         grid:{color:GRAY_GRID},min:0},
+      x:{ticks:{color:TICK_COLOR,font:TICK_FONT},grid:{color:GRAY_GRID}},
+    },
+  });
+}
+
+/* ── PARAMS ────────────────────────────────────────────────────── */
+function getP(){
+  return{
+    nPaths:    +document.getElementById('s-paths').value,
+    entryAge:  +document.getElementById('s-age').value,
+    strategy:  document.getElementById('s-strat').value,
+    muEq:      +document.getElementById('s-eq').value,
+    sigEq:     +document.getElementById('s-eqvol').value,
+    theta:     +document.getElementById('s-gs').value,
+    muInvIT:   +document.getElementById('s-invit').value,
+    thetaPi:   +document.getElementById('s-pi').value,
+    targetRR:  +document.getElementById('s-rr').value/100,
+    contrib:   +document.getElementById('s-contrib').value,
+  };
+}
+
+/* ── UPDATE ────────────────────────────────────────────────────── */
+function updateKPIs(main,baseline,params){
+  const f=v=>(+v.toFixed(2))+'x';
+  document.getElementById('k-median').textContent=f(main.medianRR);
+  document.getElementById('k-p5').textContent=f(main.p5RR);
+  document.getElementById('k-p95').textContent=f(main.p95RR);
+  document.getElementById('k-cvar').textContent=f(main.cvar95);
+  const delta=((main.medianRR/Math.max(baseline.medianRR,.001))-1)*100;
+  const el=document.getElementById('k-delta');
+  el.textContent=(delta>=0?'+':'')+delta.toFixed(1)+'%';
+  el.style.color=delta>=1.0?'var(--green)':(delta<0?'var(--red)':'var(--amber)');
+  const stratNames=['Current NPS','Proposed','AI Dynamic'];
+  const idx=['current','proposed','ai'].indexOf(params.strategy);
+  document.getElementById('k-median-sub').textContent=stratNames[idx]||'';
+  document.getElementById('hist-tag').textContent=stratNames[idx]||'';
+  document.getElementById('hero-paths').textContent=`${params.nPaths.toLocaleString()} paths`;
+  document.getElementById('footer-time').textContent=new Date().toLocaleTimeString();
+}
+
+let timer=null;
+function update(){
+  const badge=document.getElementById('status-badge');
+  badge.style.display='inline-flex';
+  clearTimeout(timer);
+  timer=setTimeout(()=>{
+    try{
+      const p=getP();
+      const years=60-p.entryAge;
+      const main=simulate(p);
+      const base=simulate({...p,strategy:'current',nPaths:Math.min(p.nPaths,400)});
+      updateKPIs(main,base,p);
+      renderFan(main,years);
+      renderHist(main.rawRR);
+      renderStrat(p);
+      renderScenario(p);
+      renderGlide();
+      renderRadar(p);
+    }catch(e){console.error(e);}
+    badge.style.display='none';
+  },280);
+}
+
+/* ── WIRE CONTROLS ─────────────────────────────────────────────── */
+const SLIDER_MAP={
+  's-paths': ['v-paths', v=>parseInt(v).toLocaleString()],
+  's-age':   ['v-age',   v=>v],
+  's-eq':    ['v-eq',    v=>parseFloat(v).toFixed(1)+'%'],
+  's-eqvol': ['v-eqvol', v=>parseFloat(v).toFixed(0)+'%'],
+  's-gs':    ['v-gs',    v=>parseFloat(v).toFixed(1)+'%'],
+  's-invit': ['v-invit', v=>parseFloat(v).toFixed(1)+'%'],
+  's-pi':    ['v-pi',    v=>parseFloat(v).toFixed(1)+'%'],
+  's-rr':    ['v-rr',    v=>parseInt(v)+'%'],
+  's-contrib':['v-contrib',v=>parseInt(v)+'%'],
+};
+Object.entries(SLIDER_MAP).forEach(([sid,[vid,fmt]])=>{
+  const el=document.getElementById(sid);
+  if(!el) return;
+  el.addEventListener('input',()=>{
+    document.getElementById(vid).textContent=fmt(el.value);
+    update();
+  });
+});
+document.getElementById('s-strat').addEventListener('change',update);
+
+/* ── SCENARIO BUTTONS ──────────────────────────────────────────── */
+document.getElementById('sc-btns').querySelectorAll('.sc-btn').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('.sc-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    const sc=SCENARIOS_DEF[btn.dataset.sc];
+    if(!sc) return;
+    const eqEl=document.getElementById('s-eq');
+    const gsEl=document.getElementById('s-gs');
+    const piEl=document.getElementById('s-pi');
+    eqEl.value=Math.min(Math.max(sc.eq,+eqEl.min),+eqEl.max);
+    gsEl.value=Math.min(Math.max(sc.gs,+gsEl.min),+gsEl.max);
+    piEl.value=Math.min(Math.max(sc.pi,+piEl.min),+piEl.max);
+    document.getElementById('v-eq').textContent=parseFloat(eqEl.value).toFixed(1)+'%';
+    document.getElementById('v-gs').textContent=parseFloat(gsEl.value).toFixed(1)+'%';
+    document.getElementById('v-pi').textContent=parseFloat(piEl.value).toFixed(1)+'%';
+    update();
+  });
+});
+
+/* ── INITIAL RENDER ────────────────────────────────────────────── */
+document.getElementById('footer-time').textContent=new Date().toLocaleTimeString();
+update();
+</script>
+</body>
+</html>

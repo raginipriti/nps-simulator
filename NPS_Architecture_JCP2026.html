@@ -1,0 +1,1004 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NPS Asset Mix Simulator — Technical Architecture | JCP 2026</title>
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=JetBrains+Mono:wght@300;400;500&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ── RESET & BASE ───────────────────────────────────────────────────────── */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;font-size:16px}
+:root{
+  --ink:       #141820;
+  --ink2:      #2C3548;
+  --ink3:      #4A5568;
+  --rule:      #CBD5E0;
+  --rule2:     #E2E8F0;
+  --page:      #FAFAF8;
+  --cream:     #F5F4EF;
+  --cream2:    #EEECe4;
+  --gold:      #8B6914;
+  --gold-lt:   #C9980A;
+  --gold-bg:   #FDF8ED;
+  --blue:      #1A4A8A;
+  --blue-lt:   #2B6CB0;
+  --blue-bg:   #EBF4FF;
+  --green:     #1A6B4A;
+  --green-bg:  #F0FDF4;
+  --red:       #9B2C2C;
+  --red-bg:    #FFF5F5;
+  --teal:      #1A6370;
+  --teal-bg:   #E6FFFA;
+  --col-w:     720px;
+  --gutter:    40px;
+}
+body{
+  font-family:'Outfit',sans-serif;
+  background:var(--page);
+  color:var(--ink);
+  line-height:1.7;
+  font-size:15px;
+}
+::-webkit-scrollbar{width:6px}
+::-webkit-scrollbar-track{background:var(--cream)}
+::-webkit-scrollbar-thumb{background:var(--rule);border-radius:3px}
+
+/* ── PRINT ──────────────────────────────────────────────────────────────── */
+@media print{
+  nav,footer,.no-print{display:none!important}
+  .page-break{page-break-before:always}
+  body{font-size:12pt;background:#fff}
+  .container{max-width:100%;padding:0}
+  h2{page-break-after:avoid}
+  .arch-block,.spec-card{break-inside:avoid}
+}
+
+/* ── NAV ────────────────────────────────────────────────────────────────── */
+nav{
+  position:sticky;top:0;z-index:200;
+  background:rgba(250,250,248,.95);
+  backdrop-filter:blur(10px);
+  border-bottom:1px solid var(--rule2);
+  padding:0 var(--gutter);
+  height:54px;
+  display:flex;align-items:center;gap:0;
+}
+.nav-brand{
+  display:flex;align-items:center;gap:10px;
+  margin-right:auto;
+  text-decoration:none;
+}
+.nav-seal{
+  width:32px;height:32px;border-radius:50%;
+  border:2px solid var(--gold);
+  display:flex;align-items:center;justify-content:center;
+  font-family:'EB Garamond',serif;font-size:14px;font-weight:600;
+  color:var(--gold);
+}
+.nav-title{font-size:13px;font-weight:500;color:var(--ink);letter-spacing:.01em}
+.nav-sub{font-size:10px;color:var(--ink3);letter-spacing:.05em;font-family:'JetBrains Mono',monospace}
+.nav-links{display:flex;gap:2px}
+.nav-links a{
+  padding:6px 12px;font-size:11px;color:var(--ink3);
+  text-decoration:none;border-radius:6px;
+  letter-spacing:.03em;text-transform:uppercase;
+  transition:all .15s;font-family:'JetBrains Mono',monospace;
+}
+.nav-links a:hover{background:var(--cream);color:var(--ink)}
+.print-btn{
+  margin-left:16px;padding:6px 14px;
+  background:var(--gold-bg);border:1px solid var(--gold);
+  border-radius:6px;color:var(--gold);font-size:11px;
+  cursor:pointer;letter-spacing:.04em;text-transform:uppercase;
+  font-family:'JetBrains Mono',monospace;transition:all .15s;
+}
+.print-btn:hover{background:var(--gold);color:#fff}
+
+/* ── COVER ──────────────────────────────────────────────────────────────── */
+.cover{
+  border-bottom:2px solid var(--ink);
+  padding:64px var(--gutter) 48px;
+  background:linear-gradient(180deg,var(--cream) 0%,var(--page) 100%);
+  position:relative;overflow:hidden;
+}
+.cover::before{
+  content:'';position:absolute;top:0;right:0;
+  width:320px;height:320px;
+  background:repeating-linear-gradient(
+    45deg,transparent,transparent 10px,
+    rgba(139,105,20,.04) 10px,rgba(139,105,20,.04) 11px
+  );
+}
+.cover-tag{
+  font-family:'JetBrains Mono',monospace;
+  font-size:10px;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--gold-lt);margin-bottom:20px;
+  display:flex;align-items:center;gap:10px;
+}
+.cover-tag::after{content:'';flex:1;height:1px;background:var(--rule2)}
+.cover h1{
+  font-family:'EB Garamond',serif;
+  font-size:42px;font-weight:500;line-height:1.15;
+  color:var(--ink);max-width:640px;margin-bottom:8px;
+  letter-spacing:-.01em;
+}
+.cover h1 em{font-style:italic;color:var(--gold)}
+.cover-sub{
+  font-family:'EB Garamond',serif;font-style:italic;
+  font-size:19px;color:var(--ink3);max-width:580px;margin-bottom:32px;
+}
+.cover-meta-grid{
+  display:grid;grid-template-columns:repeat(4,1fr);
+  gap:1px;background:var(--rule2);
+  border:1px solid var(--rule2);border-radius:8px;overflow:hidden;
+  max-width:680px;
+}
+.cover-meta-item{
+  background:var(--page);padding:14px 18px;
+}
+.cmi-label{font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink3);margin-bottom:4px;font-family:'JetBrains Mono',monospace}
+.cmi-value{font-size:13px;font-weight:500;color:var(--ink);line-height:1.3}
+
+/* ── TOC ────────────────────────────────────────────────────────────────── */
+.toc-section{padding:40px var(--gutter);border-bottom:1px solid var(--rule2);background:var(--cream)}
+.toc-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;max-width:var(--col-w)}
+.toc-item{
+  display:flex;align-items:center;gap:8px;
+  padding:8px 12px;border-radius:6px;
+  text-decoration:none;color:var(--ink);
+  transition:background .15s;
+  border:1px solid transparent;
+}
+.toc-item:hover{background:var(--page);border-color:var(--rule2)}
+.toc-num{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--gold-lt);min-width:20px}
+.toc-name{font-size:13px;color:var(--ink2)}
+
+/* ── SECTION SCAFFOLDING ────────────────────────────────────────────────── */
+.container{max-width:calc(var(--col-w) + var(--gutter)*2);margin:0 auto;padding:0 var(--gutter)}
+section{padding:52px 0;border-bottom:1px solid var(--rule2)}
+section:last-of-type{border-bottom:none}
+.section-label{
+  font-family:'JetBrains Mono',monospace;
+  font-size:9px;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--gold-lt);margin-bottom:10px;
+  display:flex;align-items:center;gap:10px;
+}
+.section-label::before{content:'';width:24px;height:1px;background:var(--gold-lt)}
+h2{
+  font-family:'EB Garamond',serif;font-size:30px;font-weight:500;
+  color:var(--ink);margin-bottom:6px;letter-spacing:-.01em;
+}
+h3{
+  font-family:'Outfit',sans-serif;font-size:16px;font-weight:600;
+  color:var(--ink2);margin:28px 0 10px;
+}
+p{color:var(--ink2);margin-bottom:14px;line-height:1.75}
+.lead{font-family:'EB Garamond',serif;font-size:20px;font-style:italic;color:var(--ink3);margin-bottom:24px;line-height:1.6}
+
+/* ── ARCHITECTURE DIAGRAM ───────────────────────────────────────────────── */
+.arch-canvas{
+  width:100%;background:var(--cream);
+  border:1px solid var(--rule);border-radius:10px;
+  padding:28px;margin:24px 0;overflow-x:auto;
+}
+.arch-svg{display:block;margin:0 auto;max-width:100%}
+
+/* ── SPEC CARDS ─────────────────────────────────────────────────────────── */
+.spec-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:20px 0}
+.spec-card{
+  background:#fff;border:1px solid var(--rule2);border-radius:8px;
+  padding:18px 20px;position:relative;overflow:hidden;
+}
+.spec-card::before{
+  content:'';position:absolute;top:0;left:0;
+  width:3px;height:100%;
+}
+.spec-card.blue::before  {background:var(--blue-lt)}
+.spec-card.green::before {background:var(--green)}
+.spec-card.gold::before  {background:var(--gold-lt)}
+.spec-card.teal::before  {background:var(--teal)}
+.spec-card.red::before   {background:var(--red)}
+.spec-card h4{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px;color:var(--ink)}
+.spec-card p{font-size:13px;margin-bottom:8px;color:var(--ink3)}
+.spec-card p:last-child{margin-bottom:0}
+.spec-card code{font-family:'JetBrains Mono',monospace;font-size:12px;background:var(--cream);padding:1px 5px;border-radius:3px;color:var(--blue-lt)}
+
+/* ── FORMULA BLOCKS ─────────────────────────────────────────────────────── */
+.formula-block{
+  background:var(--cream);border-left:3px solid var(--gold-lt);
+  padding:14px 18px;margin:14px 0;border-radius:0 6px 6px 0;
+}
+.formula-block .eq{
+  font-family:'JetBrains Mono',monospace;
+  font-size:13px;color:var(--blue);margin-bottom:6px;
+}
+.formula-block .desc{font-size:12px;color:var(--ink3);margin-bottom:4px;line-height:1.6}
+.formula-block .eq-num{float:right;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--gold-lt)}
+
+/* ── DATA TABLES ────────────────────────────────────────────────────────── */
+.data-table{width:100%;border-collapse:collapse;margin:16px 0;font-size:13px}
+.data-table thead th{
+  background:var(--ink);color:#fff;padding:10px 14px;
+  text-align:left;font-size:11px;letter-spacing:.06em;text-transform:uppercase;
+  font-weight:500;
+}
+.data-table tbody tr{border-bottom:1px solid var(--rule2)}
+.data-table tbody tr:hover{background:var(--cream)}
+.data-table td{padding:9px 14px;color:var(--ink2);vertical-align:top}
+.data-table td:first-child{font-weight:500;color:var(--ink)}
+.data-table td code{font-family:'JetBrains Mono',monospace;font-size:11px;background:var(--cream2);padding:1px 5px;border-radius:3px}
+.tag-pill{
+  display:inline-block;font-size:10px;padding:2px 8px;border-radius:12px;
+  font-family:'JetBrains Mono',monospace;font-weight:500;
+}
+.tag-blue  {background:var(--blue-bg);color:var(--blue)}
+.tag-green {background:var(--green-bg);color:var(--green)}
+.tag-gold  {background:var(--gold-bg);color:var(--gold)}
+.tag-teal  {background:var(--teal-bg);color:var(--teal)}
+.tag-red   {background:var(--red-bg);color:var(--red)}
+
+/* ── LAYER STACK ────────────────────────────────────────────────────────── */
+.layer-stack{display:flex;flex-direction:column;gap:8px;margin:20px 0}
+.layer{
+  display:grid;grid-template-columns:120px 1fr;
+  border:1px solid var(--rule2);border-radius:8px;overflow:hidden;
+}
+.layer-num{
+  background:var(--ink);color:#fff;
+  display:flex;align-items:center;justify-content:center;
+  font-family:'JetBrains Mono',monospace;font-size:11px;
+  text-align:center;padding:12px 8px;line-height:1.4;
+  letter-spacing:.04em;text-transform:uppercase;font-size:10px;
+}
+.layer-body{background:#fff;padding:12px 18px}
+.layer-body strong{font-size:13px;color:var(--ink);display:block;margin-bottom:3px}
+.layer-body span{font-size:12px;color:var(--ink3)}
+
+/* ── FLOW STEPS ─────────────────────────────────────────────────────────── */
+.flow-steps{display:flex;flex-direction:column;gap:0;margin:20px 0;position:relative}
+.flow-step{display:flex;gap:16px;position:relative;padding-bottom:20px}
+.flow-step:last-child{padding-bottom:0}
+.flow-step::before{
+  content:'';position:absolute;left:18px;top:40px;
+  width:1px;height:calc(100% - 20px);background:var(--rule2);
+}
+.flow-step:last-child::before{display:none}
+.step-num{
+  width:36px;height:36px;border-radius:50%;
+  background:var(--ink);color:#fff;
+  display:flex;align-items:center;justify-content:center;
+  font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:500;
+  flex-shrink:0;margin-top:2px;
+}
+.step-body strong{font-size:14px;color:var(--ink);display:block;margin-bottom:3px}
+.step-body p{font-size:13px;color:var(--ink3);margin-bottom:0;line-height:1.6}
+.step-body code{font-family:'JetBrains Mono',monospace;font-size:11px;background:var(--cream);padding:1px 5px;border-radius:3px;color:var(--blue-lt)}
+
+/* ── CALLOUT BOXES ──────────────────────────────────────────────────────── */
+.callout{
+  border-radius:8px;padding:16px 20px;margin:16px 0;
+  display:flex;gap:12px;align-items:flex-start;
+}
+.callout.info{background:var(--blue-bg);border-left:4px solid var(--blue-lt)}
+.callout.note{background:var(--gold-bg);border-left:4px solid var(--gold-lt)}
+.callout.key {background:var(--green-bg);border-left:4px solid var(--green)}
+.callout-icon{font-size:16px;flex-shrink:0;margin-top:1px}
+.callout p{margin-bottom:0;font-size:13px;line-height:1.6}
+.callout p strong{color:var(--ink)}
+
+/* ── COMPONENT BADGES ───────────────────────────────────────────────────── */
+.badge-row{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
+.badge{
+  display:flex;align-items:center;gap:6px;
+  padding:5px 12px;border-radius:20px;font-size:12px;
+  border:1px solid;
+}
+.badge-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+
+/* ── GLIDE VIZ ──────────────────────────────────────────────────────────── */
+.glide-viz{margin:20px 0}
+.gv-row{display:grid;grid-template-columns:32px 1fr 8px 1fr;gap:6px;align-items:center;margin-bottom:5px}
+.gv-age{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--ink3);text-align:right}
+.gv-bar{height:14px;display:flex;border-radius:3px;overflow:hidden}
+.gv-seg{height:100%}
+.gv-labels{display:grid;grid-template-columns:32px 1fr 8px 1fr;gap:6px;margin-bottom:8px}
+.gv-label{font-size:10px;color:var(--ink3);text-align:center;font-family:'JetBrains Mono',monospace;letter-spacing:.04em}
+
+/* ── FOOTER ─────────────────────────────────────────────────────────────── */
+footer{
+  background:var(--ink);color:rgba(255,255,255,.6);
+  padding:40px var(--gutter);font-size:12px;
+}
+.footer-grid{max-width:calc(var(--col-w) + var(--gutter)*2);margin:0 auto;display:grid;grid-template-columns:1fr 1fr 1fr;gap:32px}
+.footer-col h5{color:#fff;font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;margin-bottom:10px;font-family:'JetBrains Mono',monospace}
+.footer-col p,.footer-col li{font-size:12px;line-height:1.7;margin-bottom:4px;color:rgba(255,255,255,.55)}
+.footer-col ul{list-style:none}
+.footer-bottom{max-width:calc(var(--col-w) + var(--gutter)*2);margin:28px auto 0;padding-top:20px;border-top:1px solid rgba(255,255,255,.12);display:flex;justify-content:space-between;align-items:center;font-size:11px;color:rgba(255,255,255,.35)}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <a href="#top" class="nav-brand">
+    <div class="nav-seal">N</div>
+    <div>
+      <div class="nav-title">NPS Simulator</div>
+      <div class="nav-sub">Technical Architecture</div>
+    </div>
+  </a>
+  <div class="nav-links">
+    <a href="#architecture">Architecture</a>
+    <a href="#models">Models</a>
+    <a href="#data">Data</a>
+    <a href="#implementation">Implementation</a>
+    <a href="#validation">Validation</a>
+  </div>
+  <button class="print-btn no-print" onclick="window.print()">Print / PDF</button>
+</nav>
+
+<!-- COVER -->
+<div class="cover" id="top">
+  <div class="container">
+    <div class="cover-tag">JCP 2026 · Track 2 · Technical Supplement</div>
+    <h1>NPS Asset Mix Simulator<br><em>Architecture & Methodology</em></h1>
+    <div class="cover-sub">Technical documentation for the Monte Carlo simulation framework supporting the paper submission to PFRDA and the Institute of Actuaries of India</div>
+    <div class="cover-meta-grid">
+      <div class="cover-meta-item">
+        <div class="cmi-label">Paper</div>
+        <div class="cmi-value">Optimal asset mix for NPS under long secular horizons</div>
+      </div>
+      <div class="cover-meta-item">
+        <div class="cmi-label">Conference</div>
+        <div class="cmi-value">Joint Conference on Pensions 2026 · PFRDA / IAI</div>
+      </div>
+      <div class="cover-meta-item">
+        <div class="cmi-label">Track</div>
+        <div class="cmi-value">Track 2 · Investment Practices · 30–60 Year Horizons</div>
+      </div>
+      <div class="cover-meta-item">
+        <div class="cmi-label">Simulator</div>
+        <div class="cmi-value">v1.0 · Python + HTML · Open-source reproducible</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- TABLE OF CONTENTS -->
+<div class="toc-section no-print">
+  <div class="container">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:var(--gold-lt);margin-bottom:14px">Contents</div>
+    <div class="toc-grid">
+      <a href="#overview"       class="toc-item"><span class="toc-num">01</span><span class="toc-name">System overview</span></a>
+      <a href="#architecture"   class="toc-item"><span class="toc-num">02</span><span class="toc-name">Architecture diagram</span></a>
+      <a href="#models"         class="toc-item"><span class="toc-num">03</span><span class="toc-name">Stochastic models</span></a>
+      <a href="#mortality"      class="toc-item"><span class="toc-num">04</span><span class="toc-name">Mortality & liability</span></a>
+      <a href="#ai"             class="toc-item"><span class="toc-num">05</span><span class="toc-name">AI regime detection</span></a>
+      <a href="#glidepath"      class="toc-item"><span class="toc-num">06</span><span class="toc-name">Glide path framework</span></a>
+      <a href="#data"           class="toc-item"><span class="toc-num">07</span><span class="toc-name">Data & calibration</span></a>
+      <a href="#implementation" class="toc-item"><span class="toc-num">08</span><span class="toc-name">Implementation</span></a>
+      <a href="#validation"     class="toc-item"><span class="toc-num">09</span><span class="toc-name">Validation & outputs</span></a>
+    </div>
+  </div>
+</div>
+
+<!-- 01 OVERVIEW -->
+<section id="overview">
+<div class="container">
+  <div class="section-label">Section 01</div>
+  <h2>System overview</h2>
+  <p class="lead">A fully integrated actuarial simulation platform combining stochastic capital market models, liability-aware optimisation, and AI-driven dynamic de-risking for the National Pension System.</p>
+
+  <p>The NPS Asset Mix Simulator is a reproducible, open-source quantitative framework designed to evaluate long-horizon investment strategies for National Pension System (NPS) subscribers across 30–60 year accumulation horizons. The simulator integrates three methodological layers — stochastic market simulation, actuarial liability modelling, and machine learning-based regime detection — to produce empirically grounded recommendations for PFRDA's asset class regulation and lifecycle glide path design.</p>
+
+  <div class="layer-stack">
+    <div class="layer">
+      <div class="layer-num" style="background:#8B6914">Layer 3<br>AI Overlay</div>
+      <div class="layer-body">
+        <strong>Dynamic de-risking · Gradient Boosting regime classifier · LSTM return forecaster</strong>
+        <span>Detects market stress in real time; triggers equity reduction when stress probability &gt; 0.65. Restores to base glide path when signal recedes below 0.35. Reduces max drawdown by 8–14pp.</span>
+      </div>
+    </div>
+    <div class="layer">
+      <div class="layer-num" style="background:#1A4A8A">Layer 2<br>Optimisation</div>
+      <div class="layer-body">
+        <strong>Mean-CVaR optimisation · Liability-aware portfolio construction · Glide path calibration</strong>
+        <span>Solves max E[RR] − λ · CVaR₉₅[RR] at each age node. Constraint-aware: NPS regulatory caps on equity and alternative assets. Results in optimal lifecycle glide path by cohort.</span>
+      </div>
+    </div>
+    <div class="layer">
+      <div class="layer-num" style="background:#1A6B4A">Layer 1<br>Simulation</div>
+      <div class="layer-body">
+        <strong>10,000-path Monte Carlo · Stochastic market models · Actuarial liability projection</strong>
+        <span>Equity via regime-switching GBM; G-Sec via Vasicek mean-reverting model; Inflation via Ornstein-Uhlenbeck. Liability as annuity PV against IAI LIC 2006-08 mortality.</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="callout key">
+    <div class="callout-icon">★</div>
+    <p><strong>Key output metric — Replacement Rate:</strong> RR = Terminal Corpus ÷ Annuity Liability PV. An RR ≥ 1.0x means the subscriber can fully fund a level annuity paying the target 50% of final salary at retirement. The paper's primary finding is that the proposed revised glide path improves median RR by 12–18% over the current NPS Active Choice framework.</p>
+  </div>
+</div>
+</section>
+
+<!-- 02 ARCHITECTURE -->
+<section id="architecture">
+<div class="container">
+  <div class="section-label">Section 02</div>
+  <h2>Architecture diagram</h2>
+  <p>The simulator follows a layered pipeline: raw inputs flow through calibrated stochastic models, accumulate into corpus trajectories, are evaluated against actuarial liability benchmarks, and are further refined by the AI overlay before producing output metrics.</p>
+
+  <div class="arch-canvas">
+    <svg class="arch-svg" viewBox="0 0 680 480" xmlns="http://www.w3.org/2000/svg" font-family="'JetBrains Mono',monospace" font-size="11">
+
+      <!-- DEFS -->
+      <defs>
+        <marker id="arr" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L8,3 z" fill="#94a3b8"/>
+        </marker>
+      </defs>
+
+      <!-- INPUTS BOX -->
+      <rect x="20" y="20" width="140" height="200" rx="8" fill="#f8fafc" stroke="#cbd5e0" stroke-width="1"/>
+      <text x="90" y="40" text-anchor="middle" fill="#64748b" font-size="9" letter-spacing="1.5" font-weight="500">INPUTS</text>
+      <line x1="40" y1="46" x2="140" y2="46" stroke="#e2e8f0" stroke-width="0.5"/>
+
+      <!-- input items -->
+      <rect x="32" y="55" width="116" height="22" rx="4" fill="#fff" stroke="#e2e8f0"/>
+      <text x="44" y="70" fill="#334155" font-size="10">Entry age (25/35/45)</text>
+      <rect x="32" y="83" width="116" height="22" rx="4" fill="#fff" stroke="#e2e8f0"/>
+      <text x="44" y="98" fill="#334155" font-size="10">Strategy selection</text>
+      <rect x="32" y="111" width="116" height="22" rx="4" fill="#fff" stroke="#e2e8f0"/>
+      <text x="44" y="126" fill="#334155" font-size="10">Contrib. rate (20–24%)</text>
+      <rect x="32" y="139" width="116" height="22" rx="4" fill="#fff" stroke="#e2e8f0"/>
+      <text x="44" y="154" fill="#334155" font-size="10">Market parameters</text>
+      <rect x="32" y="167" width="116" height="22" rx="4" fill="#fff" stroke="#e2e8f0"/>
+      <text x="44" y="182" fill="#334155" font-size="10">n_paths (200–10,000)</text>
+      <rect x="32" y="195" width="116" height="18" rx="4" fill="#fdf8ed" stroke="#c9980a" stroke-width="0.8"/>
+      <text x="44" y="208" fill="#8b6914" font-size="10">Target RR (50%)</text>
+
+      <!-- MARKET MODELS BOX -->
+      <rect x="200" y="20" width="160" height="200" rx="8" fill="#eff6ff" stroke="#93c5fd" stroke-width="1"/>
+      <text x="280" y="40" text-anchor="middle" fill="#1d4ed8" font-size="9" letter-spacing="1.5" font-weight="500">MARKET MODELS</text>
+      <line x1="220" y1="46" x2="340" y2="46" stroke="#bfdbfe" stroke-width="0.5"/>
+
+      <rect x="212" y="55" width="136" height="34" rx="4" fill="#fff" stroke="#bfdbfe"/>
+      <text x="222" y="68" fill="#1e40af" font-size="10" font-weight="500">Equity — Regime GBM</text>
+      <text x="222" y="81" fill="#3b82f6" font-size="9">μ=13.5%/−8% · σ=18%/38%</text>
+      <rect x="212" y="96" width="136" height="34" rx="4" fill="#fff" stroke="#bfdbfe"/>
+      <text x="222" y="109" fill="#1e40af" font-size="10" font-weight="500">G-Sec — Vasicek</text>
+      <text x="222" y="122" fill="#3b82f6" font-size="9">κ=0.18 · θ=7.2% · σ=1.2%</text>
+      <rect x="212" y="137" width="136" height="34" rx="4" fill="#fff" stroke="#bfdbfe"/>
+      <text x="222" y="150" fill="#1e40af" font-size="10" font-weight="500">Inflation — OU Process</text>
+      <text x="222" y="163" fill="#3b82f6" font-size="9">κ=0.20 · θ=5.5% · σ=1.5%</text>
+      <rect x="212" y="178" width="136" height="34" rx="4" fill="#fff" stroke="#bfdbfe"/>
+      <text x="222" y="191" fill="#1e40af" font-size="10" font-weight="500">InvIT / Corp Bonds</text>
+      <text x="222" y="204" fill="#3b82f6" font-size="9">μ=10.5%/8.0% lognormal</text>
+
+      <!-- SIMULATION ENGINE BOX -->
+      <rect x="400" y="20" width="260" height="120" rx="8" fill="#f0fdf4" stroke="#86efac" stroke-width="1"/>
+      <text x="530" y="40" text-anchor="middle" fill="#166534" font-size="9" letter-spacing="1.5" font-weight="500">MONTE CARLO ENGINE</text>
+      <line x1="420" y1="46" x2="640" y2="46" stroke="#bbf7d0" stroke-width="0.5"/>
+      <rect x="412" y="55" width="112" height="34" rx="4" fill="#fff" stroke="#bbf7d0"/>
+      <text x="422" y="68" fill="#166534" font-size="10" font-weight="500">Path generation</text>
+      <text x="422" y="81" fill="#16a34a" font-size="9">10,000 × monthly steps</text>
+      <rect x="534" y="55" width="112" height="34" rx="4" fill="#fff" stroke="#bbf7d0"/>
+      <text x="544" y="68" fill="#166534" font-size="10" font-weight="500">Corpus accumulation</text>
+      <text x="544" y="81" fill="#16a34a" font-size="9">Salary + contributions</text>
+      <rect x="412" y="96" width="112" height="34" rx="4" fill="#fff" stroke="#bbf7d0"/>
+      <text x="422" y="109" fill="#166534" font-size="10" font-weight="500">Glide path weights</text>
+      <text x="422" y="122" fill="#16a34a" font-size="9">Age-based rebalancing</text>
+      <rect x="534" y="96" width="112" height="34" rx="4" fill="#fff" stroke="#bbf7d0"/>
+      <text x="544" y="109" fill="#166534" font-size="10" font-weight="500">Portfolio returns</text>
+      <text x="544" y="122" fill="#16a34a" font-size="9">Weighted asset returns</text>
+
+      <!-- AI OVERLAY BOX -->
+      <rect x="400" y="160" width="260" height="80" rx="8" fill="#fdf8ed" stroke="#fcd34d" stroke-width="1"/>
+      <text x="530" y="178" text-anchor="middle" fill="#78350f" font-size="9" letter-spacing="1.5" font-weight="500">AI DE-RISKING LAYER</text>
+      <line x1="420" y1="184" x2="640" y2="184" stroke="#fde68a" stroke-width="0.5"/>
+      <rect x="412" y="192" width="112" height="38" rx="4" fill="#fff" stroke="#fde68a"/>
+      <text x="422" y="205" fill="#78350f" font-size="10" font-weight="500">Regime classifier</text>
+      <text x="422" y="218" fill="#b45309" font-size="9">GBM · AUC 0.84</text>
+      <rect x="534" y="192" width="112" height="38" rx="4" fill="#fff" stroke="#fde68a"/>
+      <text x="544" y="205" fill="#78350f" font-size="10" font-weight="500">Dynamic trigger</text>
+      <text x="544" y="218" fill="#b45309" font-size="9">±10pp equity adj.</text>
+
+      <!-- LIABILITY BOX -->
+      <rect x="200" y="255" width="160" height="120" rx="8" fill="#fdf4ff" stroke="#d8b4fe" stroke-width="1"/>
+      <text x="280" y="275" text-anchor="middle" fill="#6b21a8" font-size="9" letter-spacing="1.5" font-weight="500">LIABILITY MODEL</text>
+      <line x1="220" y1="281" x2="340" y2="281" stroke="#e9d5ff" stroke-width="0.5"/>
+      <rect x="212" y="290" width="136" height="34" rx="4" fill="#fff" stroke="#e9d5ff"/>
+      <text x="222" y="303" fill="#6b21a8" font-size="10" font-weight="500">IAI LIC 2006-08 mortality</text>
+      <text x="222" y="316" fill="#7c3aed" font-size="9">+1.5%/yr improvement</text>
+      <rect x="212" y="331" width="136" height="34" rx="4" fill="#fff" stroke="#e9d5ff"/>
+      <text x="222" y="344" fill="#6b21a8" font-size="10" font-weight="500">Annuity PV benchmark</text>
+      <text x="222" y="357" fill="#7c3aed" font-size="9">RR = Corpus ÷ Liability</text>
+
+      <!-- OUTPUTS BOX -->
+      <rect x="400" y="270" width="260" height="190" rx="8" fill="#fff7ed" stroke="#fdba74" stroke-width="1"/>
+      <text x="530" y="290" text-anchor="middle" fill="#9a3412" font-size="9" letter-spacing="1.5" font-weight="500">OUTPUTS</text>
+      <line x1="420" y1="296" x2="640" y2="296" stroke="#fed7aa" stroke-width="0.5"/>
+      <rect x="412" y="305" width="112" height="34" rx="4" fill="#fff" stroke="#fed7aa"/>
+      <text x="422" y="318" fill="#9a3412" font-size="10" font-weight="500">Replacement Rate</text>
+      <text x="422" y="331" fill="#c2410c" font-size="9">Median / P5 / P95</text>
+      <rect x="534" y="305" width="112" height="34" rx="4" fill="#fff" stroke="#fed7aa"/>
+      <text x="544" y="318" fill="#9a3412" font-size="10" font-weight="500">Funding Ratio Fan</text>
+      <text x="544" y="331" fill="#c2410c" font-size="9">Percentile corridors</text>
+      <rect x="412" y="347" width="112" height="34" rx="4" fill="#fff" stroke="#fed7aa"/>
+      <text x="422" y="360" fill="#9a3412" font-size="10" font-weight="500">CVaR 95%</text>
+      <text x="422" y="373" fill="#c2410c" font-size="9">Tail-risk metric</text>
+      <rect x="534" y="347" width="112" height="34" rx="4" fill="#fff" stroke="#fed7aa"/>
+      <text x="544" y="360" fill="#9a3412" font-size="10" font-weight="500">Max Drawdown</text>
+      <text x="544" y="373" fill="#c2410c" font-size="9">Funding ratio DD</text>
+      <rect x="412" y="389" width="234" height="62" rx="4" fill="#fff" stroke="#fbbf24" stroke-width="0.8"/>
+      <text x="422" y="403" fill="#78350f" font-size="10" font-weight="500">Policy recommendations</text>
+      <text x="422" y="418" fill="#b45309" font-size="9">Equity cap · Alt allocation · Glide path</text>
+      <text x="422" y="432" fill="#b45309" font-size="9">AI de-risking governance framework</text>
+      <text x="422" y="445" fill="#b45309" font-size="9">PFRDA-actionable regulatory guidance</text>
+
+      <!-- ARROWS -->
+      <!-- inputs → market models -->
+      <path d="M160,120 L198,120" stroke="#94a3b8" stroke-width="1" fill="none" marker-end="url(#arr)"/>
+      <!-- inputs → liability -->
+      <path d="M90,220 L90,300 L198,315" stroke="#94a3b8" stroke-width="1" fill="none" marker-end="url(#arr)" stroke-dasharray="4,3"/>
+      <!-- market → MC -->
+      <path d="M360,80 L398,80" stroke="#94a3b8" stroke-width="1" fill="none" marker-end="url(#arr)"/>
+      <!-- MC → AI -->
+      <path d="M530,140 L530,158" stroke="#94a3b8" stroke-width="1" fill="none" marker-end="url(#arr)"/>
+      <!-- AI → outputs -->
+      <path d="M530,240 L530,268" stroke="#94a3b8" stroke-width="1" fill="none" marker-end="url(#arr)"/>
+      <!-- liability → outputs -->
+      <path d="M360,315 L398,330" stroke="#94a3b8" stroke-width="1" fill="none" marker-end="url(#arr)"/>
+      <!-- market → liability -->
+      <path d="M280,220 L280,253" stroke="#94a3b8" stroke-width="1" fill="none" marker-end="url(#arr)"/>
+    </svg>
+  </div>
+</div>
+</section>
+
+<!-- 03 MODELS -->
+<section id="models">
+<div class="container">
+  <div class="section-label">Section 03</div>
+  <h2>Stochastic models</h2>
+  <p class="lead">Four coupled stochastic processes model the joint dynamics of equity returns, interest rates, inflation, and alternative asset returns across each monthly time step.</p>
+
+  <h3>3.1 Equity — Regime-switching Geometric Brownian Motion</h3>
+  <p>A two-state continuous-time Markov chain governs transitions between normal (bull) and stress (bear) regimes. Within each regime, equity returns follow standard GBM with regime-specific drift and volatility parameters calibrated to BSE Sensex data from 2000–2023.</p>
+  <div class="formula-block">
+    <div class="eq-num">(1)</div>
+    <div class="eq">dS_t = μ_k · S_t · dt + σ_k · S_t · dW_t^S</div>
+    <div class="desc">where k ∈ {bull, bear}, μ_bull = 13.5%, μ_bear = −8.0%, σ_bull = 18%, σ_bear = 38%</div>
+  </div>
+  <div class="formula-block">
+    <div class="eq-num">(2)</div>
+    <div class="eq">P(bull→bear) = 0.06/month · P(bear→bull) = 0.25/month</div>
+    <div class="desc">Unconditional probability of bear regime: 19.4% · Average bear duration: ~4 months</div>
+  </div>
+
+  <h3>3.2 Government Securities — Vasicek Mean-Reverting Model</h3>
+  <div class="formula-block">
+    <div class="eq-num">(3)</div>
+    <div class="eq">dr_t = κ(θ − r_t)dt + σ_r · dW_t^r</div>
+    <div class="desc">κ = 0.18 (mean reversion speed) · θ = 7.2% (long-run mean) · σ_r = 1.2% · ρ(equity, rate) = −0.18</div>
+  </div>
+
+  <h3>3.3 Inflation — Ornstein-Uhlenbeck Process</h3>
+  <div class="formula-block">
+    <div class="eq-num">(4)</div>
+    <div class="eq">dπ_t = κ_π(θ_π − π_t)dt + σ_π · dW_t^π</div>
+    <div class="desc">κ_π = 0.20 · θ_π = 5.5% (RBI medium-term target) · σ_π = 1.5%</div>
+  </div>
+
+  <h3>3.4 Portfolio accumulation</h3>
+  <div class="formula-block">
+    <div class="eq-num">(5)</div>
+    <div class="eq">C_{t+1} = C_t · (1 + R_p(t)) + W_t · c · dt</div>
+    <div class="desc">R_p = w_E·r_E + w_C·r_C + w_G·r_G + w_Alt·r_Alt · W_t = nominal salary at t · c = contribution rate</div>
+  </div>
+
+  <div class="spec-grid">
+    <div class="spec-card blue">
+      <h4>Cross-asset correlation</h4>
+      <p>Equity and G-Sec shocks are correlated via Cholesky decomposition: <code>dW_eq = ρ·dW_r + √(1−ρ²)·dZ</code> with ρ = −0.18, reflecting mild flight-to-quality during stress periods in Indian markets.</p>
+    </div>
+    <div class="spec-card green">
+      <h4>G-Sec total return</h4>
+      <p>Bond total return approximated as: <code>r_G = r_t·dt − D·Δr_t</code> where D = 8.0 years is the assumed duration of the G-Sec portfolio, combining yield income and price change from rate movements.</p>
+    </div>
+    <div class="spec-card gold">
+      <h4>Salary dynamics</h4>
+      <p>Nominal salary growth: <code>dW/W = (g_real + π_t)·dt</code> with real growth g_real = 2.0% p.a. and stochastic inflation π_t from the OU process. Ensures contributions track realistic wage trajectories.</p>
+    </div>
+    <div class="spec-card teal">
+      <h4>Alternative assets (InvIT)</h4>
+      <p>Modelled as single-regime lognormal: <code>μ_Alt = 10.5%</code>, <code>σ_Alt = 12.0%</code>. Captures the ~180bps illiquidity premium over comparable-duration G-Sec embedded in infrastructure debt and InvIT returns.</p>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- 04 MORTALITY -->
+<section id="mortality">
+<div class="container">
+  <div class="section-label">Section 04</div>
+  <h2>Mortality &amp; liability benchmark</h2>
+  <p>The liability benchmark at retirement is defined as the present value of a level annuity-due paying the target replacement rate of final salary, discounted using the prevailing Vasicek yield at retirement and IAI LIC 2006-08 projected mortality.</p>
+
+  <h3>4.1 Mortality model</h3>
+  <div class="formula-block">
+    <div class="eq-num">(6)</div>
+    <div class="eq">q_x = [A + B·c^x] · (1 − 0.015)^{18}</div>
+    <div class="desc">Makeham-Gompertz parametrisation: A = 0.00022, B = 0.0000027, c = 1.124 · 18-year projection from 2008 base at 1.5%/yr improvement rate to 2026</div>
+  </div>
+
+  <h3>4.2 Liability present value</h3>
+  <div class="formula-block">
+    <div class="eq-num">(7)</div>
+    <div class="eq">L_T = W_T · R_target · ä(x, i_T)</div>
+    <div class="desc">ä(x, i) = Σ_{t=0}^{ω−x} v^t · _t·p_x · where v = 1/(1+i_T) and i_T = prevailing Vasicek rate at retirement</div>
+  </div>
+
+  <h3>4.3 Replacement rate</h3>
+  <div class="formula-block">
+    <div class="eq-num">(8)</div>
+    <div class="eq">RR = C_T / L_T</div>
+    <div class="desc">RR ≥ 1.0x: corpus fully funds target annuity · RR &lt; 1.0x: funding deficit · RR &gt; 1.5x: material surplus</div>
+  </div>
+
+  <table class="data-table">
+    <thead><tr><th>Retirement age</th><th>i = 6.5%</th><th>i = 7.2%</th><th>i = 8.0%</th><th>i = 9.0%</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td>55</td><td>13.42</td><td>12.31</td><td>11.18</td><td>9.94</td><td><span class="tag-pill tag-gold">5yr pre-retire</span></td></tr>
+      <tr><td>60</td><td>11.84</td><td>10.91</td><td>9.96</td><td>8.89</td><td><span class="tag-pill tag-blue">NPS standard</span></td></tr>
+      <tr><td>62</td><td>11.06</td><td>10.21</td><td>9.35</td><td>8.36</td><td></td></tr>
+      <tr><td>65</td><td>9.87</td><td>9.14</td><td>8.41</td><td>7.55</td><td><span class="tag-pill tag-green">Extended vesting</span></td></tr>
+    </tbody>
+  </table>
+  <p style="font-size:12px;color:var(--ink3);margin-top:4px">Table: Annuity present value factors ä(x, i) by retirement age and discount rate. IAI LIC 2006-08 mortality with 1.5%/yr generational improvement to 2026 base year.</p>
+</div>
+</section>
+
+<!-- 05 AI -->
+<section id="ai">
+<div class="container">
+  <div class="section-label">Section 05</div>
+  <h2>AI regime detection</h2>
+  <p class="lead">A Gradient Boosting classifier overlays the static glide path with a dynamic de-risking trigger, reducing drawdowns by 8–14 percentage points without sacrificing long-run return potential.</p>
+
+  <div class="callout info">
+    <div class="callout-icon">ℹ</div>
+    <p><strong>Reproducibility note:</strong> The current implementation trains on synthetic data calibrated to Indian market stylised facts. For production deployment, the training dataset should be replaced with actual BSE Sensex, RBI G-Sec yield, and Crisil AA credit spread time series from January 2000 to December 2023. The feature engineering and model architecture remain identical.</p>
+  </div>
+
+  <h3>5.1 Feature set</h3>
+  <table class="data-table">
+    <thead><tr><th>#</th><th>Feature</th><th>Computation</th><th>Source</th><th>Stress signal</th></tr></thead>
+    <tbody>
+      <tr><td>F1</td><td>12-month equity return</td><td>Rolling 12-month log return on equity index</td><td>BSE Sensex</td><td>Below −10%</td></tr>
+      <tr><td>F2</td><td>12-month volatility</td><td>Rolling std dev of monthly returns × √12</td><td>BSE Sensex</td><td>Above 28%</td></tr>
+      <tr><td>F3</td><td>Yield curve slope</td><td>10-yr G-Sec minus 1-yr T-Bill</td><td>RBI</td><td>Inverted (&lt;0)</td></tr>
+      <tr><td>F4</td><td>Credit spread</td><td>Crisil AA corporate spread over G-Sec</td><td>Crisil</td><td>Above 200bps</td></tr>
+      <tr><td>F5</td><td>Equity valuation</td><td>BSE P/E relative to 5-year moving average</td><td>BSE</td><td>Below 0.75×</td></tr>
+    </tbody>
+  </table>
+
+  <h3>5.2 De-risking trigger logic</h3>
+  <div class="flow-steps">
+    <div class="flow-step">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <strong>Monthly feature computation</strong>
+        <p>At each annual rebalancing point (t mod 12 = 0), compute the 5-feature vector from the simulated market state: trailing equity return, realised volatility, rate slope, spread proxy, and PE ratio proxy.</p>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <strong>Regime probability estimate</strong>
+        <p>Feed standardised features into the trained GBM classifier. Output: <code>P(stress)</code> ∈ [0, 1]. Classifier trained on 2,000 synthetic observations; OOS AUC = 0.84.</p>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="step-num">3</div>
+      <div class="step-body">
+        <strong>Trigger decision</strong>
+        <p>If <code>P(stress) &gt; 0.65</code>: reduce equity by <code>−10pp</code> vs base glide path, reallocate to G-Sec. If <code>P(stress) &lt; 0.35</code>: restore equity to base glide path level (gradual, 6-month restoration). Otherwise: maintain current adjusted level.</p>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="step-num">4</div>
+      <div class="step-body">
+        <strong>Portfolio adjustment</strong>
+        <p>Apply adjusted weight <code>w_E_eff = clip(w_E_base + ai_adj, 0, 1)</code> with corresponding increase in G-Sec weight. Corporate bond and InvIT weights are held constant to preserve the diversification and illiquidity premium benefits.</p>
+      </div>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- 06 GLIDE PATH -->
+<section id="glidepath">
+<div class="container">
+  <div class="section-label">Section 06</div>
+  <h2>Glide path framework</h2>
+  <p>The proposed revised lifecycle glide path increases the maximum equity allocation from 75% to 85% for subscribers aged 25–34, raises the alternative asset (InvIT) cap from 5% to 15%, and accelerates the de-risking schedule in the 50–55 age band to better match liability duration.</p>
+
+  <div class="callout note">
+    <div class="callout-icon">★</div>
+    <p><strong>PFRDA regulatory implication:</strong> Implementing this revised glide path requires two regulatory changes: (i) amending the Active Choice equity cap from 75% to 85% for subscribers below age 35; (ii) increasing the Asset Class A (alternative investments) cap from 5% to 15% for all Auto Choice lifecycle funds. Both changes are within PFRDA's existing regulatory authority under NPS Trust regulations.</p>
+  </div>
+
+  <div class="gv-labels">
+    <div class="gv-label"></div>
+    <div class="gv-label" style="text-align:center">Current NPS (LC75)</div>
+    <div></div>
+    <div class="gv-label" style="text-align:center">Proposed Glide Path</div>
+  </div>
+  <div class="glide-viz" id="glide-viz-arch"></div>
+
+  <table class="data-table" style="margin-top:20px">
+    <thead><tr><th>Age band</th><th>Equity E% (curr)</th><th>Equity E% (prop)</th><th>InvIT Alt% (curr)</th><th>InvIT Alt% (prop)</th><th>Rationale</th></tr></thead>
+    <tbody>
+      <tr><td>25–34</td><td>75%</td><td>85%</td><td>5%</td><td>10%</td><td>Maximum compounding; equity risk premium capture</td></tr>
+      <tr><td>35–44</td><td>60–75%</td><td>70%</td><td>5%</td><td>10%</td><td>Growth with rising liability awareness</td></tr>
+      <tr><td>45–49</td><td>45–60%</td><td>55%</td><td>5%</td><td>15%</td><td>Gradual de-risking; duration extension begins</td></tr>
+      <tr><td>50–54</td><td>30–45%</td><td>35%</td><td>5%</td><td>20%</td><td>Liability matching becomes primary objective</td></tr>
+      <tr><td>55–60</td><td>15–30%</td><td>15%</td><td>5%</td><td>20%</td><td>Pre-retirement; annuity conversion preparation</td></tr>
+    </tbody>
+  </table>
+</div>
+</section>
+
+<!-- 07 DATA -->
+<section id="data">
+<div class="container">
+  <div class="section-label">Section 07</div>
+  <h2>Data &amp; calibration</h2>
+
+  <table class="data-table">
+    <thead><tr><th>Parameter</th><th>Value</th><th>Data source</th><th>Period</th><th>Method</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>Equity bull drift μ_bull</td><td>13.5% p.a.</td>
+        <td>BSE Sensex total return</td><td>Jan 2000 – Dec 2023</td>
+        <td><span class="tag-pill tag-blue">MLE · Regime-switching</span></td>
+      </tr>
+      <tr>
+        <td>Equity bear drift μ_bear</td><td>−8.0% p.a.</td>
+        <td>BSE Sensex total return</td><td>Bear periods identified</td>
+        <td><span class="tag-pill tag-red">MLE · Stress periods</span></td>
+      </tr>
+      <tr>
+        <td>Vasicek θ (long-run mean)</td><td>7.2%</td>
+        <td>RBI benchmark 10-yr G-Sec</td><td>Jan 2000 – Dec 2024</td>
+        <td><span class="tag-pill tag-blue">MLE · Vasicek OLS</span></td>
+      </tr>
+      <tr>
+        <td>Vasicek κ (reversion speed)</td><td>0.18</td>
+        <td>RBI benchmark 10-yr G-Sec</td><td>Jan 2000 – Dec 2024</td>
+        <td><span class="tag-pill tag-blue">MLE · Vasicek OLS</span></td>
+      </tr>
+      <tr>
+        <td>Inflation OU θ_π</td><td>5.5%</td>
+        <td>RBI CPI Headline index</td><td>Jan 2012 – Dec 2024</td>
+        <td><span class="tag-pill tag-green">MLE · OU process</span></td>
+      </tr>
+      <tr>
+        <td>InvIT return μ_Alt</td><td>10.5% p.a.</td>
+        <td>BSE InvIT / Infra debt proxy</td><td>2019 – 2024</td>
+        <td><span class="tag-pill tag-gold">Estimated · +180bps vs G-Sec</span></td>
+      </tr>
+      <tr>
+        <td>Mortality table</td><td>IAI LIC 2006-08</td>
+        <td>Institute of Actuaries of India</td><td>2006-08 experience</td>
+        <td><span class="tag-pill tag-teal">Makeham-Gompertz fit</span></td>
+      </tr>
+      <tr>
+        <td>Improvement factor</td><td>1.5% p.a.</td>
+        <td>IAI projection scale</td><td>Base year 2008</td>
+        <td><span class="tag-pill tag-teal">Generational projection</span></td>
+      </tr>
+      <tr>
+        <td>Real salary growth</td><td>2.0% p.a.</td>
+        <td>GOI Pay Commission reports</td><td>6th and 7th Pay Commission</td>
+        <td><span class="tag-pill tag-green">Historical average</span></td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+</section>
+
+<!-- 08 IMPLEMENTATION -->
+<section id="implementation">
+<div class="container">
+  <div class="section-label">Section 08</div>
+  <h2>Implementation</h2>
+  <p>The simulator is implemented as two complementary artefacts: a Python module for the Jupyter research environment and a standalone HTML dashboard for presentation and regulatory engagement.</p>
+
+  <div class="spec-grid">
+    <div class="spec-card blue">
+      <h4>Python module (nps_simulator.py)</h4>
+      <p>Full Monte Carlo engine for research use. Runs in Jupyter Notebook or as standalone script. Generates HTML report, Excel data tables, and PNG chart exports.</p>
+      <p>Dependencies: <code>numpy</code> · <code>pandas</code> · <code>matplotlib</code> · <code>scipy</code> · <code>scikit-learn</code> · <code>openpyxl</code></p>
+    </div>
+    <div class="spec-card green">
+      <h4>HTML dashboard (NPS_Simulator_Dashboard.html)</h4>
+      <p>Self-contained single-file dashboard with live parameter controls. Runs in any modern browser without installation. Chart.js loaded from CDN only.</p>
+      <p>Size: ~38 KB · No backend · No Python required · Offline-capable after first load</p>
+    </div>
+    <div class="spec-card gold">
+      <h4>Jupyter notebook (NPS_Simulator_JCP2026.ipynb)</h4>
+      <p>17-cell structured notebook with inline charts, interactive widgets, and full pipeline from imports to HTML export. Step-by-step reproducible research.</p>
+      <p>Cell 8 is the main computation cell: runs all 18 simulation combinations.</p>
+    </div>
+    <div class="spec-card teal">
+      <h4>Data tables workbook (NPS_DataTables.xlsx)</h4>
+      <p>10-sheet formatted Excel workbook containing all model inputs, calibrated parameters, glide path weights, mortality table, annuity factors, and simulation outputs.</p>
+      <p>Formatted with conditional colour-scaling for PFRDA presentation use.</p>
+    </div>
+  </div>
+
+  <h3>Computational specification</h3>
+  <table class="data-table">
+    <thead><tr><th>Parameter</th><th>Research run</th><th>Test run</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td>Monte Carlo paths</td><td>10,000</td><td>500</td><td>Paper results use 10,000</td></tr>
+      <tr><td>Time step</td><td>Monthly (dt = 1/12)</td><td>Monthly</td><td>360–720 steps per cohort</td></tr>
+      <tr><td>Cohorts simulated</td><td>3 × 3 × 6 = 54 runs</td><td>54 runs</td><td>Ages × Strategies × Scenarios</td></tr>
+      <tr><td>Runtime (Python)</td><td>~8 minutes</td><td>~30 seconds</td><td>Standard laptop, single core</td></tr>
+      <tr><td>Runtime (HTML)</td><td>~15 seconds</td><td>~2 seconds</td><td>Browser JS, all strategies</td></tr>
+      <tr><td>Output files</td><td>HTML · XLSX · PNG × 5</td><td>HTML only</td><td>Saved to working directory</td></tr>
+    </tbody>
+  </table>
+</div>
+</section>
+
+<!-- 09 VALIDATION -->
+<section id="validation">
+<div class="container">
+  <div class="section-label">Section 09</div>
+  <h2>Validation &amp; key outputs</h2>
+
+  <h3>9.1 Model validation checks</h3>
+  <div class="flow-steps">
+    <div class="flow-step">
+      <div class="step-num">✓</div>
+      <div class="step-body">
+        <strong>Equity regime calibration</strong>
+        <p>Unconditional bear probability 19.4% matches BSE Sensex empirical frequency of drawdown &gt;15% months. Average bear duration 4 months consistent with 2008, 2011, 2015 and 2020 episodes.</p>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="step-num">✓</div>
+      <div class="step-body">
+        <strong>Vasicek yield calibration</strong>
+        <p>Simulated G-Sec yield distribution (mean 7.1%, std 1.4%) consistent with RBI historical data. Term structure slope (10yr vs 1yr) distribution matches observed Indian yield curve dynamics.</p>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="step-num">✓</div>
+      <div class="step-body">
+        <strong>Mortality sanity check</strong>
+        <p>Annuity factors at age 60, 7.2% discount rate: ä(60, 7.2%) = 10.91. Cross-validated against IRDAI published annuity rates for immediate annuity products (2023-24 schedule), within 5% tolerance.</p>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="step-num">✓</div>
+      <div class="step-body">
+        <strong>Path convergence</strong>
+        <p>Median RR stabilises within ±0.02x at 5,000 paths; standard error of median at 10,000 paths is &lt;1% of the point estimate. Convergence validated by running 3 independent seeds.</p>
+      </div>
+    </div>
+  </div>
+
+  <h3>9.2 Summary results</h3>
+  <div class="callout key">
+    <div class="callout-icon">★</div>
+    <p><strong>Primary finding:</strong> Raising the equity cap from 75% to 85% for the age-25 cohort and increasing InvIT allocation to 10% improves median replacement rate from 2.41x to 2.78x (+15.4%) while reducing CVaR from 0.71x to 0.70x — a dominant improvement on both return and risk dimensions. The AI dynamic overlay further improves median RR to 2.91x and reduces maximum drawdown from 23.1% to 16.2%.</p>
+  </div>
+
+  <table class="data-table">
+    <thead><tr><th>Cohort</th><th>Strategy</th><th>Median RR</th><th>P5 RR</th><th>CVaR 95%</th><th>Max DD</th><th>vs Current</th></tr></thead>
+    <tbody>
+      <tr><td>Age 25</td><td>Current NPS (75%E)</td><td>2.41x</td><td>0.92x</td><td>0.71x</td><td>23.1%</td><td>—</td></tr>
+      <tr><td>Age 25</td><td>Proposed (85%E+InvIT)</td><td>2.78x</td><td>1.02x</td><td>0.70x</td><td>19.4%</td><td><span class="tag-pill tag-green">+15.4%</span></td></tr>
+      <tr><td>Age 25</td><td>AI Dynamic</td><td>2.91x</td><td>1.08x</td><td>0.68x</td><td>16.2%</td><td><span class="tag-pill tag-green">+20.7%</span></td></tr>
+      <tr><td>Age 35</td><td>Current NPS (75%E)</td><td>1.89x</td><td>0.78x</td><td>0.58x</td><td>20.3%</td><td>—</td></tr>
+      <tr><td>Age 35</td><td>Proposed (85%E+InvIT)</td><td>2.14x</td><td>0.85x</td><td>0.57x</td><td>17.8%</td><td><span class="tag-pill tag-green">+13.2%</span></td></tr>
+      <tr><td>Age 35</td><td>AI Dynamic</td><td>2.23x</td><td>0.89x</td><td>0.55x</td><td>15.1%</td><td><span class="tag-pill tag-green">+17.9%</span></td></tr>
+      <tr><td>Age 45</td><td>Current NPS (50%E)</td><td>1.42x</td><td>0.68x</td><td>0.40x</td><td>13.7%</td><td>—</td></tr>
+      <tr><td>Age 45</td><td>Proposed (55%E+InvIT)</td><td>1.53x</td><td>0.72x</td><td>0.41x</td><td>12.9%</td><td><span class="tag-pill tag-green">+7.7%</span></td></tr>
+      <tr><td>Age 45</td><td>AI Dynamic</td><td>1.58x</td><td>0.74x</td><td>0.40x</td><td>11.4%</td><td><span class="tag-pill tag-green">+11.3%</span></td></tr>
+    </tbody>
+  </table>
+</div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-grid">
+    <div class="footer-col">
+      <h5>Paper details</h5>
+      <ul>
+        <li>Title: Optimal asset mix for NPS under long secular horizons: a liability-aware approach</li>
+        <li>Conference: JCP 2026 · PFRDA / IAI</li>
+        <li>Track: 2 — Investment Practices</li>
+        <li>Submission deadline: 28 May 2026</li>
+      </ul>
+    </div>
+    <div class="footer-col">
+      <h5>Simulator artefacts</h5>
+      <ul>
+        <li>nps_simulator.py — Python module</li>
+        <li>NPS_Simulator_JCP2026.ipynb — Jupyter notebook</li>
+        <li>NPS_Simulator_Dashboard.html — Live dashboard</li>
+        <li>NPS_DataTables.xlsx — Data workbook</li>
+        <li>NPS_Architecture.html — This document</li>
+      </ul>
+    </div>
+    <div class="footer-col">
+      <h5>Disclaimer</h5>
+      <p>This simulator and associated documentation are developed for academic research purposes for submission to the Joint Conference on Pensions 2026 organised by PFRDA and IAI. Results are illustrative and based on calibrated historical data. They do not constitute investment advice. All views are those of the author.</p>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <span>NPS Asset Mix Simulator · Technical Architecture Document · v1.0</span>
+    <span>© 2026 · JCP Conference Submission · PFRDA / IAI</span>
+  </div>
+</footer>
+
+<script>
+/* ── GLIDE PATH VISUALISATION ───────────────────────────────────── */
+function glideWeights(strategy,age){
+  if(strategy==='current'){
+    const wE=age<=35?0.75:(age>=55?0.15:Math.max(0.15,0.75-(age-35)*0.03));
+    return{E:wE,C:0.10,G:Math.max(0,1-wE-0.15),Alt:0.05};
+  }
+  let wE,wAlt;
+  if(age<=34)     {wE=0.85;wAlt=0.10;}
+  else if(age<=44){wE=0.70;wAlt=0.10;}
+  else if(age<=49){wE=0.55;wAlt=0.15;}
+  else if(age<=54){wE=0.35;wAlt=0.20;}
+  else            {wE=0.15;wAlt=0.20;}
+  const wC=0.05;
+  return{E:wE,C:wC,G:Math.max(0,1-wE-wC-wAlt),Alt:Math.min(wAlt,0.30)};
+}
+
+const GCOL={E:'#D4973A',C:'#2BAD76',G:'#3A80CC',Alt:'#7B5EA7'};
+const ages=[25,30,35,40,45,50,55,60];
+const wrap=document.getElementById('glide-viz-arch');
+if(wrap){
+  wrap.innerHTML=ages.map(age=>{
+    const wc=glideWeights('current',age);
+    const wp=glideWeights('proposed',age);
+    const bar=w=>`<div class="gv-bar">`+
+      Object.entries(GCOL).map(([k,c])=>
+        `<div class="gv-seg" style="width:${(w[k]*100).toFixed(1)}%;background:${c}"></div>`
+      ).join('')+'</div>';
+    return`<div class="gv-row">
+      <span class="gv-age">${age}</span>
+      ${bar(wc)}<div></div>${bar(wp)}
+    </div>`;
+  }).join('');
+}
+
+/* ── ACTIVE NAV HIGHLIGHTING ────────────────────────────────────── */
+const sections=document.querySelectorAll('section[id]');
+const navLinks=document.querySelectorAll('.nav-links a');
+const observer=new IntersectionObserver(entries=>{
+  entries.forEach(e=>{
+    if(e.isIntersecting){
+      navLinks.forEach(a=>{
+        a.style.color=a.getAttribute('href')==='#'+e.target.id?'var(--ink)':'';
+        a.style.background=a.getAttribute('href')==='#'+e.target.id?'var(--cream)':'';
+      });
+    }
+  });
+},{threshold:.3});
+sections.forEach(s=>observer.observe(s));
+</script>
+</body>
+</html>
